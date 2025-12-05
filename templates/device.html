@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ device.brand_name or device.manufacturer }} {{ device.model }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        },
+                        secondary: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                        },
+                        danger: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                        }
+                    },
+                    boxShadow: {
+                        'card': '0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04)',
+                        'card-hover': '0 4px 12px rgba(0,0,0,0.1), 0 8px 32px rgba(0,0,0,0.08)',
+                        'float': '0 8px 32px rgba(99, 102, 241, 0.25)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        .card {
+            transition: all 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 8px 32px rgba(0,0,0,0.08);
+        }
+        
+        .chat-message {
+            animation: slideIn 0.2s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fab {
+            transition: all 0.2s ease;
+        }
+        .fab:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.35);
+        }
+        
+        .status-dot {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    
+    <!-- Top Notification Bar -->
+    <div id="notification-bar" class="fixed top-0 left-0 right-0 z-50 bg-primary-600 text-white px-4 py-3 shadow-lg transition-transform duration-300">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span class="material-icons-round text-primary-200">notifications_active</span>
+                <span class="text-sm font-medium">Enable alerts for device recalls and safety updates</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="enableNotifications()" id="notify-btn" 
+                    class="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center space-x-2">
+                    <span class="material-icons-round text-sm">notifications</span>
+                    <span id="notify-btn-text">Enable Alerts</span>
+                </button>
+                <button onclick="hideNotificationBar()" class="p-1.5 hover:bg-white/20 rounded-full transition-all">
+                    <span class="material-icons-round text-sm">close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="pt-16 pb-8 px-4 md:px-6 lg:px-8 max-w-6xl mx-auto">
+        
+        <!-- Header Section -->
+        <div class="mb-8">
+            <a href="/" class="inline-flex items-center text-slate-500 hover:text-primary-600 text-sm mb-4 transition-colors">
+                <span class="material-icons-round text-sm mr-1">arrow_back</span>
+                Back to Home
+            </a>
+            
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div class="flex-1">
+                    <!-- Source Badge -->
+                    {% if device.source == 'gudid' %}
+                    <div class="inline-flex items-center bg-secondary-100 text-secondary-600 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                        <span class="material-icons-round text-sm mr-1">verified</span>
+                        FDA GUDID Verified
+                    </div>
+                    {% elif device.source == 'local' %}
+                    <div class="inline-flex items-center bg-primary-100 text-primary-600 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                        <span class="material-icons-round text-sm mr-1">database</span>
+                        Local Database
+                    </div>
+                    {% else %}
+                    <div class="inline-flex items-center bg-slate-200 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                        <span class="material-icons-round text-sm mr-1">help_outline</span>
+                        Unknown Device
+                    </div>
+                    {% endif %}
+                    
+                    <h1 class="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
+                        {{ device.brand_name or device.manufacturer }} {{ device.model }}
+                    </h1>
+                    <p class="text-slate-500 text-lg">{{ device.manufacturer }}</p>
+                    {% if device.catalog_number %}
+                    <p class="text-slate-400 text-sm mt-1">Catalog: {{ device.catalog_number }}</p>
+                    {% endif %}
+                </div>
+                
+                {% if device.commercial_status %}
+                <div class="flex-shrink-0">
+                    <span class="inline-flex items-center {% if device.commercial_status == 'In Commercial Distribution' %}bg-secondary-500{% else %}bg-slate-400{% endif %} text-white text-xs font-medium px-4 py-2 rounded-full">
+                        <span class="w-2 h-2 bg-white rounded-full mr-2 status-dot"></span>
+                        {{ device.commercial_status }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if device.description %}
+            <p class="text-slate-600 mt-4 max-w-3xl leading-relaxed">{{ device.description }}</p>
+            {% endif %}
+        </div>
+
+        <!-- FDA Recall Alert Card -->
+        <div id="recall-card" class="card bg-white rounded-2xl shadow-card p-6 mb-6 border border-slate-100">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-11 h-11 bg-primary-100 rounded-xl flex items-center justify-center">
+                        <span class="material-icons-round text-primary-600 text-xl">shield</span>
+                    </div>
+                    <div>
+                        <h2 class="font-semibold text-slate-900">FDA Recall Status</h2>
+                        <p class="text-slate-500 text-sm">Real-time check against openFDA</p>
+                    </div>
+                </div>
+                <button onclick="checkRecalls()" class="p-2 hover:bg-slate-100 rounded-full transition-colors" title="Refresh">
+                    <span class="material-icons-round text-slate-400 text-xl">refresh</span>
+                </button>
+            </div>
+            <div id="recall-status">
+                <div class="flex items-center space-x-3 text-slate-500">
+                    <div class="w-5 h-5 border-2 border-primary-300 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Checking FDA database...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Column - Main Info -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                {% if device.source == 'gudid' %}
+                <!-- Safety Information Card -->
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">health_and_safety</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Safety Information</h2>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">MRI Safety</div>
+                            <div class="font-semibold {% if device.mri_safety == 'MR Safe' %}text-secondary-600{% elif device.mri_safety == 'MR Unsafe' %}text-danger-600{% elif device.mri_safety == 'MR Conditional' %}text-primary-600{% else %}text-slate-600{% endif %}">
+                                {{ device.mri_safety or 'Not specified' }}
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">Single Use</div>
+                            <div class="font-semibold text-slate-800">
+                                {% if device.single_use %}Yes{% elif device.single_use == false %}No{% else %}—{% endif %}
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">Sterile</div>
+                            <div class="font-semibold text-slate-800">
+                                {% if device.sterile %}Yes{% elif device.sterile == false %}No{% else %}—{% endif %}
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">Contains Latex</div>
+                            <div class="font-semibold text-slate-800">
+                                {% if device.contains_latex %}Yes{% elif device.no_latex %}No{% else %}—{% endif %}
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">Prescription</div>
+                            <div class="font-semibold text-slate-800">
+                                {% if device.rx %}Rx Only{% elif device.otc %}OTC{% else %}—{% endif %}
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div class="text-xs text-slate-500 uppercase tracking-wide mb-1">Device Class</div>
+                            <div class="font-semibold text-slate-800">
+                                {% if device.device_class %}Class {{ device.device_class }}{% else %}—{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Device Details Card -->
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">description</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Device Details</h2>
+                    </div>
+                    
+                    <div class="divide-y divide-slate-100">
+                        {% if device.combination_product %}
+                        <div class="flex items-center justify-between py-3">
+                            <span class="text-slate-600">Combination Product</span>
+                            <span class="font-medium text-slate-900">Yes</span>
+                        </div>
+                        {% endif %}
+                        {% if device.lot_batch %}
+                        <div class="flex items-center justify-between py-3">
+                            <span class="text-slate-600">Lot/Batch Number</span>
+                            <span class="font-medium text-slate-900">Required</span>
+                        </div>
+                        {% endif %}
+                        {% if device.expiration_date %}
+                        <div class="flex items-center justify-between py-3">
+                            <span class="text-slate-600">Expiration Date</span>
+                            <span class="font-medium text-slate-900">Has Expiration</span>
+                        </div>
+                        {% endif %}
+                        {% if device.fda_product_codes and device.fda_product_codes|length > 0 %}
+                        <div class="flex items-center justify-between py-3">
+                            <span class="text-slate-600">FDA Product Code</span>
+                            <span class="font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded">{{ device.fda_product_codes[0].code }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Storage Conditions -->
+                {% if device.storage and device.storage|length > 0 %}
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">thermostat</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Storage Conditions</h2>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        {% for storage in device.storage %}
+                            {% if storage.special %}
+                            <p class="text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">{{ storage.special }}</p>
+                            {% elif storage.high and storage.high.value and storage.low and storage.low.value %}
+                            <div class="flex items-center justify-between py-2">
+                                <span class="text-slate-600">{{ storage.type }}</span>
+                                <span class="font-medium text-primary-600 bg-primary-50 px-3 py-1 rounded-full text-sm">
+                                    {{ storage.low.value }}°C — {{ storage.high.value }}°C
+                                </span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- GMDN Definition -->
+                {% if device.gmdn_definition %}
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">menu_book</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">GMDN Definition</h2>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed">{{ device.gmdn_definition }}</p>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                <!-- Quick Tips -->
+                {% if device.quick_tips %}
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">lightbulb</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Quick Tips</h2>
+                    </div>
+                    <ul class="space-y-3">
+                        {% for tip in device.quick_tips %}
+                        <li class="flex items-start space-x-3">
+                            <span class="w-5 h-5 bg-secondary-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span class="material-icons-round text-secondary-600 text-xs">check</span>
+                            </span>
+                            <span class="text-slate-600">{{ tip }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- Common Alarms -->
+                {% if device.common_alarms %}
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">notifications</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Common Alarms</h2>
+                    </div>
+                    <div class="space-y-3">
+                        {% for alarm in device.common_alarms %}
+                        <div class="bg-slate-50 rounded-xl p-4 border-l-4 border-primary-400">
+                            <div class="font-semibold text-slate-900 mb-1">{{ alarm.code }}</div>
+                            <div class="text-slate-600 text-sm mb-2">{{ alarm.meaning }}</div>
+                            <div class="flex items-center text-secondary-600 text-sm font-medium">
+                                <span class="material-icons-round text-sm mr-1">arrow_forward</span>
+                                {{ alarm.action }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right Column - Sidebar -->
+            <div class="space-y-6">
+                
+                <!-- Quick Questions Card -->
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">help</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Quick Questions</h2>
+                    </div>
+                    <div class="space-y-2">
+                        {% for question in quick_questions %}
+                        <button 
+                            onclick="askQuickQuestion('{{ question }}')"
+                            class="w-full text-left text-sm bg-slate-50 hover:bg-primary-50 hover:text-primary-700 text-slate-700 px-4 py-3 rounded-xl transition-all flex items-center justify-between group border border-slate-100 hover:border-primary-200"
+                        >
+                            <span>{{ question }}</span>
+                            <span class="material-icons-round text-sm text-slate-400 group-hover:text-primary-500 transition-colors">arrow_forward</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Contact Card -->
+                {% if device.contacts and device.contacts|length > 0 %}
+                <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-5">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">support_agent</span>
+                        </div>
+                        <h2 class="font-semibold text-slate-900">Manufacturer Contact</h2>
+                    </div>
+                    {% for contact in device.contacts %}
+                    <div class="space-y-2">
+                        {% if contact.phone %}
+                        <a href="tel:{{ contact.phone }}" class="flex items-center space-x-3 p-3 bg-slate-50 hover:bg-primary-50 rounded-xl transition-colors group border border-slate-100 hover:border-primary-200">
+                            <span class="material-icons-round text-slate-400 group-hover:text-primary-600">phone</span>
+                            <span class="text-slate-700 group-hover:text-primary-700 font-medium">{{ contact.phone }}</span>
+                        </a>
+                        {% endif %}
+                        {% if contact.email %}
+                        <a href="mailto:{{ contact.email }}" class="flex items-center space-x-3 p-3 bg-slate-50 hover:bg-primary-50 rounded-xl transition-colors group border border-slate-100 hover:border-primary-200">
+                            <span class="material-icons-round text-slate-400 group-hover:text-primary-600">email</span>
+                            <span class="text-slate-700 group-hover:text-primary-700 text-sm break-all">{{ contact.email }}</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Manual Link -->
+                {% if device.manual_url %}
+                <a href="{{ device.manual_url }}" target="_blank" 
+                   class="card bg-primary-600 hover:bg-primary-700 rounded-2xl shadow-card p-5 flex items-center space-x-4 text-white transition-all">
+                    <div class="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span class="material-icons-round text-xl">picture_as_pdf</span>
+                    </div>
+                    <div>
+                        <div class="font-semibold">View Full Manual</div>
+                        <div class="text-primary-200 text-sm">PDF Documentation</div>
+                    </div>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Chat Button -->
+    <button onclick="toggleChat()" id="chat-fab" 
+        class="fab fixed bottom-6 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 rounded-full shadow-float flex items-center justify-center text-white z-40">
+        <span class="material-icons-round text-xl" id="chat-fab-icon">chat</span>
+    </button>
+
+    <!-- Floating Chat Window -->
+    <div id="chat-window" class="fixed bottom-24 right-6 w-96 max-w-[calc(100vw-3rem)] bg-white rounded-2xl shadow-float z-40 hidden overflow-hidden border border-slate-200">
+        <!-- Chat Header -->
+        <div class="bg-primary-600 p-4 text-white">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                        <span class="material-icons-round">smart_toy</span>
+                    </div>
+                    <div>
+                        <div class="font-semibold">AI Assistant</div>
+                        <div class="text-primary-200 text-xs">Ask about {{ device.brand_name or device.model }}</div>
+                    </div>
+                </div>
+                <button onclick="toggleChat()" class="p-1.5 hover:bg-white/20 rounded-full transition-colors">
+                    <span class="material-icons-round text-xl">close</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Chat Messages -->
+        <div id="chat-messages" class="h-80 overflow-y-auto p-4 space-y-4 bg-slate-50">
+            <div class="text-center py-8">
+                <div class="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="material-icons-round text-primary-600 text-2xl">psychology</span>
+                </div>
+                <p class="text-slate-500 text-sm">Ask me anything about this device</p>
+            </div>
+        </div>
+        
+        <!-- Chat Input -->
+        <div class="p-4 bg-white border-t border-slate-100">
+            <div class="flex items-center space-x-2">
+                <input 
+                    type="text" 
+                    id="question-input"
+                    placeholder="Type your question..."
+                    class="flex-1 bg-slate-100 border border-slate-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    onkeypress="if(event.key === 'Enter') askQuestion()"
+                >
+                <button 
+                    onclick="askQuestion()"
+                    id="ask-button"
+                    class="w-11 h-11 bg-primary-600 hover:bg-primary-700 rounded-full flex items-center justify-center text-white transition-colors"
+                >
+                    <span class="material-icons-round text-lg">send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var deviceId = "{{ device.id }}";
+        var deviceName = "{{ device.brand_name or device.model }}";
+        var manufacturer = "{{ device.manufacturer }}";
+        var chatHistory = [];
+        var chatOpen = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkRecalls();
+            updateNotificationStatus();
+        });
+
+        // ============================================
+        // CHAT
+        // ============================================
+        
+        function toggleChat() {
+            var chatWindow = document.getElementById('chat-window');
+            var fabIcon = document.getElementById('chat-fab-icon');
+            
+            chatOpen = !chatOpen;
+            
+            if (chatOpen) {
+                chatWindow.classList.remove('hidden');
+                fabIcon.textContent = 'close';
+                document.getElementById('question-input').focus();
+            } else {
+                chatWindow.classList.add('hidden');
+                fabIcon.textContent = 'chat';
+            }
+        }
+
+        // ============================================
+        // NOTIFICATIONS
+        // ============================================
+        
+        function hideNotificationBar() {
+            document.getElementById('notification-bar').style.transform = 'translateY(-100%)';
+        }
+        
+        function updateNotificationStatus() {
+            var btn = document.getElementById('notify-btn');
+            var btnText = document.getElementById('notify-btn-text');
+            
+            if (!('Notification' in window)) {
+                btnText.textContent = 'Not Supported';
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+                return;
+            }
+            
+            if (Notification.permission === 'granted') {
+                btnText.textContent = 'Alerts Enabled ✓';
+                btn.classList.add('bg-white/40');
+            } else if (Notification.permission === 'denied') {
+                btnText.textContent = 'Blocked';
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+            }
+        }
+        
+        function enableNotifications() {
+            var btn = document.getElementById('notify-btn');
+            var btnText = document.getElementById('notify-btn-text');
+            
+            if (!('Notification' in window)) {
+                alert('Your browser does not support notifications');
+                return;
+            }
+            
+            if (Notification.permission === 'granted') {
+                new Notification('🔔 Test Alert', { body: 'Notifications are working for ' + deviceName });
+                return;
+            }
+            
+            btnText.textContent = 'Requesting...';
+            btn.disabled = true;
+            
+            Notification.requestPermission().then(function(permission) {
+                updateNotificationStatus();
+                if (permission === 'granted') {
+                    new Notification('🔔 Alerts Enabled!', { body: 'You will receive recall alerts for ' + deviceName });
+                    hideNotificationBar();
+                }
+                btn.disabled = false;
+            }).catch(function(e) {
+                btnText.textContent = 'Error';
+                btn.disabled = false;
+            });
+        }
+
+        // ============================================
+        // RECALLS
+        // ============================================
+        
+        function checkRecalls() {
+            var statusDiv = document.getElementById('recall-status');
+            
+            fetch('/api/recalls/check/' + deviceId)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        statusDiv.innerHTML = '<div class="flex items-center space-x-2 text-slate-500"><span class="material-icons-round">error_outline</span><span>Unable to check recalls</span></div>';
+                        return;
+                    }
+                    
+                    if (data.recalls_found > 0) {
+                        var html = '<div class="bg-danger-50 border border-danger-200 rounded-xl p-4">';
+                        html += '<div class="flex items-center space-x-2 text-danger-700 font-semibold mb-3">';
+                        html += '<span class="material-icons-round">warning</span>';
+                        html += '<span>' + data.recalls_found + ' Recall(s) Found</span>';
+                        html += '</div>';
+                        
+                        data.recalls.forEach(function(r) {
+                            html += '<div class="bg-white rounded-lg p-3 mb-2 last:mb-0 border border-danger-100">';
+                            html += '<div class="font-medium text-danger-800 text-sm">' + r.recall_number + '</div>';
+                            html += '<div class="text-danger-600 text-xs mt-1">' + r.product + '</div>';
+                            html += '<div class="text-danger-500 text-xs mt-1"><em>' + r.reason + '</em></div>';
+                            html += '</div>';
+                        });
+                        
+                        html += '</div>';
+                        statusDiv.innerHTML = html;
+                        
+                        document.getElementById('recall-card').classList.add('bg-danger-50', 'border-danger-200');
+                        document.getElementById('recall-card').classList.remove('bg-white', 'border-slate-100');
+                        
+                        if (Notification.permission === 'granted') {
+                            new Notification('⚠️ FDA Recall Alert', { body: manufacturer + ': ' + (data.recalls[0].reason || 'Check device').substring(0, 80) });
+                        }
+                    } else {
+                        statusDiv.innerHTML = '<div class="flex items-center space-x-3 text-secondary-600 bg-secondary-50 rounded-xl p-4 border border-secondary-100">' +
+                            '<span class="material-icons-round text-2xl">check_circle</span>' +
+                            '<div><div class="font-semibold">No Active Recalls</div>' +
+                            '<div class="text-secondary-500 text-sm">Verified against FDA openFDA database</div></div>' +
+                            '</div>';
+                    }
+                })
+                .catch(function(e) {
+                    statusDiv.innerHTML = '<div class="flex items-center justify-between text-slate-500">' +
+                        '<span>Unable to check recalls</span>' +
+                        '<button onclick="checkRecalls()" class="text-primary-600 hover:text-primary-700 text-sm font-medium">Retry</button>' +
+                        '</div>';
+                });
+        }
+
+        // ============================================
+        // CHAT
+        // ============================================
+        
+        function addMessage(text, role) {
+            var container = document.getElementById('chat-messages');
+            var placeholder = container.querySelector('.text-center');
+            if (placeholder) placeholder.remove();
+            
+            var div = document.createElement('div');
+            div.className = 'chat-message flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+            
+            var bubble = document.createElement('div');
+            bubble.className = role === 'user' 
+                ? 'bg-primary-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[80%]' 
+                : 'bg-white shadow-sm border border-slate-200 text-slate-800 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[80%]';
+            
+            bubble.innerHTML = '<div class="text-sm">' + text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') + '</div>';
+            div.appendChild(bubble);
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTyping() {
+            var container = document.getElementById('chat-messages');
+            var div = document.createElement('div');
+            div.id = 'typing-indicator';
+            div.className = 'chat-message flex justify-start';
+            div.innerHTML = '<div class="bg-white shadow-sm border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3">' +
+                '<div class="flex items-center space-x-1.5">' +
+                '<div class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>' +
+                '<div class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay:150ms"></div>' +
+                '<div class="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay:300ms"></div>' +
+                '</div></div>';
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function hideTyping() {
+            var typing = document.getElementById('typing-indicator');
+            if (typing) typing.remove();
+        }
+
+        function askQuestion() {
+            var input = document.getElementById('question-input');
+            var question = input.value.trim();
+            if (!question) return;
+            
+            if (!chatOpen) toggleChat();
+            
+            input.disabled = true;
+            document.getElementById('ask-button').disabled = true;
+            
+            addMessage(question, 'user');
+            chatHistory.push({role: 'user', content: question});
+            input.value = '';
+            showTyping();
+            
+            fetch('/api/ask', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ device_id: deviceId, question: question, chat_history: chatHistory.slice(-10) })
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                hideTyping();
+                addMessage(data.answer, 'assistant');
+                chatHistory.push({role: 'assistant', content: data.answer});
+            })
+            .catch(function(e) {
+                hideTyping();
+                addMessage('Sorry, there was an error. Please try again.', 'assistant');
+            })
+            .finally(function() {
+                input.disabled = false;
+                document.getElementById('ask-button').disabled = false;
+                input.focus();
+            });
+        }
+
+        function askQuickQuestion(question) {
+            document.getElementById('question-input').value = question;
+            askQuestion();
+        }
+    </script>
+</body>
+</html>

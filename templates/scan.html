@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Device UDI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QuaggaJS for barcode scanning -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <style>
+        #scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        #scanner-container video {
+            width: 100%;
+            border-radius: 8px;
+        }
+        #scanner-container canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 100px;
+            border: 3px solid #3B82F6;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #EF4444;
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-lg mx-auto p-4">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">Scan Device Barcode</h1>
+            <p class="text-gray-600 text-sm mt-1">Point your camera at the UDI barcode on the device</p>
+        </div>
+
+        <!-- Scanner -->
+        <div id="scanner-container" class="bg-black rounded-lg overflow-hidden mb-4">
+            <div id="interactive" class="viewport"></div>
+            <div class="scanner-overlay">
+                <div class="scanner-line"></div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex gap-2 mb-4">
+            <button 
+                id="start-btn"
+                onclick="startScanner()"
+                class="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-600"
+            >
+                📷 Start Camera
+            </button>
+            <button 
+                id="stop-btn"
+                onclick="stopScanner()"
+                class="flex-1 bg-gray-500 text-white px-4 py-3 rounded-lg font-medium hover:bg-gray-600 hidden"
+            >
+                ⏹ Stop
+            </button>
+        </div>
+
+        <!-- Manual Entry -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <h2 class="font-semibold text-gray-800 mb-2">Or Enter Manually</h2>
+            <div class="flex gap-2">
+                <input 
+                    type="text" 
+                    id="manual-udi"
+                    placeholder="Enter UDI or Device Identifier"
+                    class="flex-1 border rounded-lg px-3 py-2 text-sm"
+                >
+                <button 
+                    onclick="lookupManual()"
+                    class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600"
+                >
+                    Look Up
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                Example Device IDs: <code class="bg-gray-100 px-1">08717648200274</code> (Abbott stent)
+            </p>
+        </div>
+
+        <!-- Result -->
+        <div id="result" class="hidden">
+            <div id="result-content" class="bg-white rounded-lg shadow p-4">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+            <p id="error-message" class="text-red-700 text-sm"></p>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+            <p class="text-gray-600 mt-2">Looking up device in FDA GUDID...</p>
+        </div>
+
+        <!-- Back Link -->
+        <a href="/" class="block text-center text-blue-500 text-sm mt-4 hover:underline">
+            ← Back to Home
+        </a>
+    </div>
+
+    <script>
+        let scannerRunning = false;
+
+        function startScanner() {
+            document.getElementById('start-btn').classList.add('hidden');
+            document.getElementById('stop-btn').classList.remove('hidden');
+            document.getElementById('error').classList.add('hidden');
+            
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#interactive'),
+                    constraints: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "i2of5_reader",
+                        "2of5_reader"
+                    ]
+                },
+                locate: true
+            }, function(err) {
+                if (err) {
+                    showError("Camera access denied or not available: " + err.message);
+                    stopScanner();
+                    return;
+                }
+                Quagga.start();
+                scannerRunning = true;
+            });
+
+            Quagga.onDetected(function(result) {
+                if (result && result.codeResult) {
+                    const code = result.codeResult.code;
+                    console.log("Barcode detected:", code);
+                    
+                    // Vibrate if available
+                    if (navigator.vibrate) {
+                        navigator.vibrate(200);
+                    }
+                    
+                    // Stop scanner and lookup
+                    stopScanner();
+                    lookupDevice(code);
+                }
+            });
+        }
+
+        function stopScanner() {
+            if (scannerRunning) {
+                Quagga.stop();
+                scannerRunning = false;
+            }
+            document.getElementById('start-btn').classList.remove('hidden');
+            document.getElementById('stop-btn').classList.add('hidden');
+        }
+
+        function lookupManual() {
+            const udi = document.getElementById('manual-udi').value.trim();
+            if (!udi) {
+                showError("Please enter a UDI or Device Identifier");
+                return;
+            }
+            lookupDevice(udi);
+        }
+
+        async function lookupDevice(identifier) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            
+            try {
+                // Try UDI lookup first
+                const response = await fetch('/api/lookup/udi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({udi: identifier})
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('loading').classList.add('hidden');
+                
+                if (data.found) {
+                    showResult(data.device, data.redirect_url);
+                } else {
+                    // Try direct DI lookup
+                    const diResponse = await fetch(`/api/lookup/di/${identifier}`);
+                    const diData = await diResponse.json();
+                    
+                    if (diData.found) {
+                        showResult(diData.device, `/device/${identifier}`);
+                    } else {
+                        showError(`Device not found in GUDID: ${identifier}`);
+                        // Show option to view page anyway
+                        showResult({
+                            id: identifier,
+                            manufacturer: "Unknown",
+                            brand_name: "Unknown Device",
+                            description: "Device not found in GUDID. AI assistant can help search for information.",
+                            source: "unknown"
+                        }, `/device/${identifier}`);
+                    }
+                }
+            } catch (error) {
+                document.getElementById('loading').classList.add('hidden');
+                showError("Failed to lookup device: " + error.message);
+            }
+        }
+
+        function showResult(device, redirectUrl) {
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('result-content');
+            
+            const sourceLabel = device.source === 'gudid' ? '✓ FDA GUDID' : 
+                               device.source === 'local' ? '✓ Local Database' : '? Unknown';
+            const sourceColor = device.source === 'gudid' ? 'text-green-600' : 
+                               device.source === 'local' ? 'text-blue-600' : 'text-yellow-600';
+            
+            contentDiv.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <div class="text-xs ${sourceColor} font-medium">${sourceLabel}</div>
+                        <h3 class="font-bold text-lg text-gray-800">${device.brand_name || device.model || 'Unknown Device'}</h3>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-600 space-y-1 mb-4">
+                    <p><strong>Manufacturer:</strong> ${device.manufacturer || 'Unknown'}</p>
+                    ${device.model ? `<p><strong>Model:</strong> ${device.model}</p>` : ''}
+                    ${device.type ? `<p><strong>Type:</strong> ${device.type}</p>` : ''}
+                    ${device.mri_safety ? `<p><strong>MRI Safety:</strong> ${device.mri_safety}</p>` : ''}
+                </div>
+                ${device.description ? `<p class="text-xs text-gray-500 mb-4">${device.description.substring(0, 200)}${device.description.length > 200 ? '...' : ''}</p>` : ''}
+                <a href="${redirectUrl}" class="block w-full bg-blue-500 text-white text-center py-3 rounded-lg font-medium hover:bg-blue-600">
+                    View Device Details & AI Assistant →
+                </a>
+            `;
+            
+            resultDiv.classList.remove('hidden');
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            document.getElementById('error-message').textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        // Enter key support for manual input
+        document.getElementById('manual-udi').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') lookupManual();
+        });
+    </script>
+</body>
+</html>

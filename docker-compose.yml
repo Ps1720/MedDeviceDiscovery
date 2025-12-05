@@ -1,0 +1,38 @@
+services:
+  web:
+    build: .
+    container_name: med-device-discovery
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - HOST_IP=${HOST_IP:-localhost}
+      - PORT=${PORT:-8080}
+      - FLASK_ENV=${FLASK_ENV:-production}
+    volumes:
+      - ./static/qr_codes:/app/static/qr_codes
+      - ./data:/app/data
+    restart: unless-stopped
+
+  web-dev:
+    build: .
+    container_name: med-device-discovery-dev
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - HOST_IP=${HOST_IP:-localhost}
+      - PORT=${PORT:-8080}
+      - FLASK_ENV=development
+    volumes:
+      - .:/app
+      - ./static/qr_codes:/app/static/qr_codes
+    command: python app.py
+    profiles:
+      - dev

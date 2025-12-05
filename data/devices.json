@@ -1,0 +1,82 @@
+{
+    "philips_mx800": {
+        "manufacturer": "Philips",
+        "model": "IntelliVue MX800",
+        "type": "Patient Monitor",
+        "description": "Bedside patient monitor for critical care settings with comprehensive hemodynamic monitoring",
+        "features": ["ECG", "SpO2", "NIBP", "IBP", "EtCO2", "Temperature", "Cardiac Output"],
+        "common_alarms": [
+            {"code": "APNEA", "meaning": "No breath detected for set time", "action": "Check patient airway and breathing"},
+            {"code": "LEADS OFF", "meaning": "ECG electrode disconnected", "action": "Check and reattach ECG electrodes"},
+            {"code": "LOW SPO2", "meaning": "Oxygen saturation below limit", "action": "Assess patient, check probe placement"},
+            {"code": "ASYSTOLE", "meaning": "No heart rhythm detected", "action": "Immediate patient assessment, check leads"}
+        ],
+        "quick_tips": [
+            "Main menu: Press the Main Screen key at bottom left",
+            "Silence alarms: Yellow silence button on top right (mutes for 2 min)",
+            "Print strip: Press and hold the waveform you want to print",
+            "Change alarm limits: Tap the parameter box, select Alarm Limits"
+        ],
+        "manual_url": "https://www.documents.philips.com/assets/20180705/6a4d5b7de567474c8d18a8e800d0a3ad.pdf"
+    },
+    "draeger_apollo": {
+        "manufacturer": "Dräger",
+        "model": "Apollo",
+        "type": "Anesthesia Machine",
+        "description": "Anesthesia workstation for surgical procedures with integrated ventilator and monitoring",
+        "features": ["Ventilator", "Vaporizers", "Fresh Gas Flow", "Breathing System", "Monitoring"],
+        "common_alarms": [
+            {"code": "HIGH PRESSURE", "meaning": "Airway pressure exceeded limit", "action": "Check for obstruction, reduce tidal volume"},
+            {"code": "LOW O2", "meaning": "Oxygen supply pressure low", "action": "Check O2 cylinder and pipeline supply"},
+            {"code": "APNEA", "meaning": "No ventilation detected", "action": "Check breathing circuit connections"},
+            {"code": "AGENT LOW", "meaning": "Vaporizer level low", "action": "Refill anesthetic agent"}
+        ],
+        "quick_tips": [
+            "Standby mode: Hold Standby key for 2 seconds",
+            "Silence alarms: Press yellow Alarm Silence button",
+            "Change vent mode: Press Mode key, select desired mode",
+            "Fresh gas flow: Adjust O2 and Air knobs on front panel"
+        ],
+        "manual_url": "https://www.draeger.com/Products/Content/apollo-anaesthesia-workstation-ifu-9066837-en.pdf"
+    },
+    "bd_alaris_8015": {
+        "manufacturer": "BD",
+        "model": "Alaris 8015",
+        "type": "Infusion Pump",
+        "description": "Modular infusion system for IV medication delivery with drug library support",
+        "features": ["Primary Infusion", "Secondary Infusion", "Drug Library", "Dose Calculation", "Multiple Channels"],
+        "common_alarms": [
+            {"code": "AIR IN LINE", "meaning": "Air bubble detected in tubing", "action": "Open door, prime air out of line, restart"},
+            {"code": "OCCLUSION", "meaning": "Downstream blockage detected", "action": "Check IV site, tubing, and clamps"},
+            {"code": "DOOR OPEN", "meaning": "Pump door not fully closed", "action": "Close and latch the pump door"},
+            {"code": "EMPTY", "meaning": "Container empty or nearly empty", "action": "Replace IV bag, prime if needed"}
+        ],
+        "quick_tips": [
+            "Start infusion: Program rate and VTBI, press Start",
+            "Change rate: Press Channel Select, enter new rate",
+            "Bolus: Press Bolus key, set amount, confirm",
+            "Silence: Press yellow Silence button (2 min silence)"
+        ],
+        "manual_url": "https://www.bd.com/en-us/products/infusion/infusion-pumps/alaris-system"
+    },
+    "ge_b650": {
+        "manufacturer": "GE Healthcare",
+        "model": "CARESCAPE B650",
+        "type": "Patient Monitor",
+        "description": "High-acuity patient monitor for OR and ICU with advanced hemodynamic capabilities",
+        "features": ["ECG", "SpO2", "NIBP", "IBP", "EtCO2", "BIS", "NMT", "Hemodynamics"],
+        "common_alarms": [
+            {"code": "CHECK SENSOR", "meaning": "SpO2 sensor issue", "action": "Reposition or replace SpO2 sensor"},
+            {"code": "ARTIFACT", "meaning": "Signal interference detected", "action": "Reduce patient movement, check connections"},
+            {"code": "BRADY", "meaning": "Heart rate below set limit", "action": "Assess patient, verify alarm limits"},
+            {"code": "TACHY", "meaning": "Heart rate above set limit", "action": "Assess patient, verify alarm limits"}
+        ],
+        "quick_tips": [
+            "Home screen: Press Home button on front panel",
+            "Alarm limits: Touch parameter tile, select Limits",
+            "Freeze waveform: Touch and hold the waveform",
+            "NIBP measurement: Press NIBP Start button"
+        ],
+        "manual_url": "https://www.gehealthcare.com/products/patient-monitoring/patient-monitors/carescape-monitor-b650"
+    }
+}

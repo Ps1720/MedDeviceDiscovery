@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Device Discovery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        },
+                        secondary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        }
+                    },
+                    boxShadow: {
+                        'card': '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)',
+                        'card-hover': '0 4px 12px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .card {
+            transition: all 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+        }
+        .search-input:focus {
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-100">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
+                        <span class="material-icons-round text-white">biotech</span>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-900">MedDevice Discovery</h1>
+                        <p class="text-xs text-slate-500">FDA GUDID Integration</p>
+                    </div>
+                </div>
+                <a href="/scan" class="hidden md:flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <span class="material-icons-round text-sm">qr_code_scanner</span>
+                    <span class="font-medium text-sm">Scan Device</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-12 md:py-16">
+            <div class="max-w-2xl">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">
+                    Instant Medical Device Information
+                </h2>
+                <p class="text-primary-100 text-lg mb-8">
+                    Scan any UDI barcode or search by device ID to get real-time safety data, recall status, and specifications from the FDA GUDID database.
+                </p>
+                
+                <!-- Main Search Bar -->
+                <div class="bg-white rounded-2xl p-2 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="flex-1 flex items-center">
+                            <span class="material-icons-round text-slate-400 ml-4">search</span>
+                            <input 
+                                type="text" 
+                                id="main-search"
+                                placeholder="Enter device ID, UDI, or search by name..."
+                                class="flex-1 px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none text-lg"
+                                onkeypress="if(event.key === 'Enter') performSearch()"
+                            >
+                        </div>
+                        <button 
+                            onclick="performSearch()"
+                            class="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center space-x-2"
+                        >
+                            <span>Search</span>
+                            <span class="material-icons-round text-sm">arrow_forward</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Quick Examples -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="text-primary-200 text-sm">Try:</span>
+                    <button onclick="quickSearch('08717648200274')" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-colors">XIENCE Stent</button>
+                    <button onclick="quickSearch('00643169706590')" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-colors">Medtronic Pacemaker</button>
+                    <button onclick="quickSearch('00382903471874')" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition-colors">BD Syringe</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-8">
+        
+        <!-- Action Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 -mt-8">
+            <!-- Scan Card -->
+            <a href="/scan" class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100 flex items-start space-x-4">
+                <div class="w-12 h-12 bg-secondary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span class="material-icons-round text-secondary-600 text-2xl">qr_code_scanner</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-1">Scan Barcode</h3>
+                    <p class="text-slate-500 text-sm">Use your camera to scan any UDI barcode on a device</p>
+                </div>
+            </a>
+            
+            <!-- FDA Badge -->
+            <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100 flex items-start space-x-4">
+                <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span class="material-icons-round text-primary-600 text-2xl">verified</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-1">FDA GUDID</h3>
+                    <p class="text-slate-500 text-sm">Real-time data from FDA's Global Unique Device Identification Database</p>
+                </div>
+            </div>
+            
+            <!-- Recall Alerts -->
+            <div class="card bg-white rounded-2xl shadow-card p-6 border border-slate-100 flex items-start space-x-4">
+                <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span class="material-icons-round text-primary-600 text-2xl">notifications_active</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-1">Recall Alerts</h3>
+                    <p class="text-slate-500 text-sm">Automatic check against openFDA recall database</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- QR Code Generator -->
+            <div class="card bg-white rounded-2xl shadow-card border border-slate-100 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">qr_code_2</span>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-900">QR Code Generator</h3>
+                            <p class="text-slate-500 text-sm">Generate QR for any device ID</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="flex gap-2 mb-4">
+                        <input 
+                            type="text" 
+                            id="qr-device-id"
+                            placeholder="Enter device ID (e.g., 08717648200274)"
+                            class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent search-input"
+                        >
+                        <button 
+                            onclick="generateQR()"
+                            class="bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-xl font-medium transition-colors flex items-center space-x-2"
+                        >
+                            <span class="material-icons-round text-sm">qr_code</span>
+                            <span>Generate</span>
+                        </button>
+                    </div>
+                    
+                    <!-- QR Result -->
+                    <div id="qr-result" class="hidden">
+                        <div class="bg-slate-50 rounded-xl p-6 text-center border border-slate-100">
+                            <img id="qr-image" class="w-48 h-48 mx-auto mb-4 rounded-lg shadow-sm">
+                            <p class="text-slate-600 text-sm mb-2">Scan this QR code with your phone</p>
+                            <a id="qr-link" href="#" target="_blank" class="text-primary-600 hover:text-primary-700 text-sm font-medium inline-flex items-center space-x-1">
+                                <span>Open device page</span>
+                                <span class="material-icons-round text-sm">open_in_new</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Placeholder when no QR -->
+                    <div id="qr-placeholder" class="bg-slate-50 rounded-xl p-8 text-center border border-dashed border-slate-200">
+                        <span class="material-icons-round text-slate-300 text-5xl mb-3">qr_code_2</span>
+                        <p class="text-slate-400 text-sm">Enter a device ID above to generate QR code</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Results / Recent Devices -->
+            <div class="card bg-white rounded-2xl shadow-card border border-slate-100 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <span class="material-icons-round text-primary-600">search</span>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-900">Search Results</h3>
+                            <p class="text-slate-500 text-sm">Find devices by name or ID</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <!-- Search Results Container -->
+                    <div id="search-results">
+                        <div class="text-center py-8">
+                            <span class="material-icons-round text-slate-300 text-5xl mb-3">medical_services</span>
+                            <p class="text-slate-400 text-sm">Search for a device to see results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Devices Section -->
+        {% if devices %}
+        <div class="mt-10">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-900">Demo Devices</h3>
+                    <p class="text-slate-500 text-sm">Sample devices from local database</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for device_id, device in devices.items() %}
+                <div class="card bg-white rounded-2xl shadow-card border border-slate-100 overflow-hidden">
+                    <div class="bg-slate-50 p-4 flex justify-center border-b border-slate-100">
+                        <img 
+                            src="/qr/{{ device_id }}" 
+                            alt="QR Code for {{ device.model }}"
+                            class="w-32 h-32"
+                        >
+                    </div>
+                    <div class="p-4">
+                        <div class="inline-flex items-center bg-primary-100 text-primary-700 text-xs font-medium px-2 py-0.5 rounded-full mb-2">
+                            <span class="material-icons-round text-xs mr-1">database</span>
+                            {{ device.type }}
+                        </div>
+                        <h4 class="font-semibold text-slate-900">{{ device.manufacturer }} {{ device.model }}</h4>
+                        <p class="text-slate-500 text-sm mt-1 line-clamp-2">{{ device.description }}</p>
+                        <a 
+                            href="/device/{{ device_id }}" 
+                            class="mt-3 inline-flex items-center text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        >
+                            <span>View details</span>
+                            <span class="material-icons-round text-sm ml-1">arrow_forward</span>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick Test IDs -->
+        <div class="mt-10">
+            <div class="card bg-white rounded-2xl shadow-card border border-slate-100 p-6">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-10 h-10 bg-secondary-100 rounded-xl flex items-center justify-center">
+                        <span class="material-icons-round text-secondary-600">science</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-slate-900">Test Device IDs</h3>
+                        <p class="text-slate-500 text-sm">Click to search real FDA GUDID devices</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <button onclick="quickSearch('08717648200274')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                        <div>
+                            <div class="font-medium text-slate-900 group-hover:text-primary-700">XIENCE Alpine Stent</div>
+                            <div class="text-xs text-slate-500">08717648200274</div>
+                        </div>
+                        <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                    </button>
+                    
+                    <button onclick="quickSearch('00643169706590')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                        <div>
+                            <div class="font-medium text-slate-900 group-hover:text-primary-700">Medtronic Pacemaker</div>
+                            <div class="text-xs text-slate-500">00643169706590</div>
+                        </div>
+                        <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                    </button>
+                    
+                    <button onclick="quickSearch('00382903471874')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                        <div>
+                            <div class="font-medium text-slate-900 group-hover:text-primary-700">BD Syringe</div>
+                            <div class="text-xs text-slate-500">00382903471874</div>
+                        </div>
+                        <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                    </button>
+                    
+                    <button onclick="quickSearch('00801741045011')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                        <div>
+                            <div class="font-medium text-slate-900 group-hover:text-primary-700">HeartMate 3 LVAD</div>
+                            <div class="text-xs text-slate-500">00801741045011</div>
+                        </div>
+                        <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                    </button>
+                    
+                    <button onclick="quickSearch('04030539099301')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                        <div>
+                            <div class="font-medium text-slate-900 group-hover:text-primary-700">B.Braun Infusion</div>
+                            <div class="text-xs text-slate-500">04030539099301</div>
+                        </div>
+                        <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                    </button>
+                    
+                    <button onclick="quickSearch('00380445555219')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                        <div>
+                            <div class="font-medium text-slate-900 group-hover:text-primary-700">Stryker Hip System</div>
+                            <div class="text-xs text-slate-500">00380445555219</div>
+                        </div>
+                        <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-100 mt-12">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                        <span class="material-icons-round text-white text-sm">biotech</span>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-slate-900 text-sm">Medical Device Discovery</p>
+                        <p class="text-slate-500 text-xs">STA Engineering Challenge 2026</p>
+                    </div>
+                </div>
+                <div class="text-slate-500 text-sm">
+                    Server: <code class="bg-slate-100 px-2 py-0.5 rounded text-xs">{{ base_url }}</code>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Perform search - either go directly to device or show search results
+        function performSearch() {
+            var query = document.getElementById('main-search').value.trim();
+            if (!query) return;
+            
+            // If it looks like a device ID (numeric), go directly to device page
+            if (/^\d{10,14}$/.test(query)) {
+                window.location.href = '/device/' + query;
+                return;
+            }
+            
+            // Otherwise, search
+            searchDevices(query);
+        }
+        
+        // Quick search from buttons
+        function quickSearch(deviceId) {
+            document.getElementById('main-search').value = deviceId;
+            window.location.href = '/device/' + deviceId;
+        }
+        
+        // Search devices via API
+        function searchDevices(query) {
+            var resultsDiv = document.getElementById('search-results');
+            resultsDiv.innerHTML = '<div class="flex items-center justify-center py-8"><div class="w-6 h-6 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mr-3"></div><span class="text-slate-500">Searching...</span></div>';
+            
+            fetch('/api/search?q=' + encodeURIComponent(query))
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.total === 0) {
+                        resultsDiv.innerHTML = '<div class="text-center py-8"><span class="material-icons-round text-slate-300 text-4xl mb-2">search_off</span><p class="text-slate-500">No devices found for "' + query + '"</p></div>';
+                        return;
+                    }
+                    
+                    var html = '<div class="text-sm text-slate-500 mb-4">Found ' + data.total + ' device(s)</div><div class="space-y-2">';
+                    
+                    // Local results
+                    data.local_results.forEach(function(device) {
+                        html += '<a href="/device/' + device.id + '" class="flex items-center justify-between p-3 bg-slate-50 hover:bg-primary-50 rounded-xl border border-slate-100 hover:border-primary-200 transition-all group">';
+                        html += '<div>';
+                        html += '<span class="inline-flex items-center bg-primary-100 text-primary-700 text-xs font-medium px-2 py-0.5 rounded-full mr-2">Local</span>';
+                        html += '<span class="font-medium text-slate-900 group-hover:text-primary-700">' + device.manufacturer + ' ' + device.model + '</span>';
+                        html += '</div>';
+                        html += '<span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>';
+                        html += '</a>';
+                    });
+                    
+                    // GUDID results
+                    data.gudid_results.forEach(function(device) {
+                        html += '<a href="/device/' + device.id + '" class="flex items-center justify-between p-3 bg-slate-50 hover:bg-primary-50 rounded-xl border border-slate-100 hover:border-primary-200 transition-all group">';
+                        html += '<div class="flex-1 min-w-0">';
+                        html += '<div class="flex items-center flex-wrap gap-2">';
+                        html += '<span class="inline-flex items-center bg-secondary-100 text-secondary-700 text-xs font-medium px-2 py-0.5 rounded-full">FDA GUDID</span>';
+                        html += '<span class="font-medium text-slate-900 group-hover:text-primary-700">' + device.manufacturer + '</span>';
+                        html += '</div>';
+                        html += '<p class="text-slate-500 text-sm truncate mt-1">' + (device.brand_name || device.model || '') + '</p>';
+                        html += '</div>';
+                        html += '<span class="material-icons-round text-slate-400 group-hover:text-primary-500 flex-shrink-0 ml-2">arrow_forward</span>';
+                        html += '</a>';
+                    });
+                    
+                    html += '</div>';
+                    resultsDiv.innerHTML = html;
+                })
+                .catch(function(error) {
+                    resultsDiv.innerHTML = '<div class="text-center py-8"><span class="material-icons-round text-red-300 text-4xl mb-2">error</span><p class="text-red-500">Error: ' + error.message + '</p></div>';
+                });
+        }
+        
+        // Generate QR Code
+        function generateQR() {
+            var deviceId = document.getElementById('qr-device-id').value.trim();
+            if (!deviceId) {
+                alert('Please enter a device ID');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('qr-placeholder').classList.add('hidden');
+            document.getElementById('qr-result').classList.remove('hidden');
+            document.getElementById('qr-image').src = '';
+            document.getElementById('qr-image').alt = 'Generating...';
+            
+            fetch('/generate-qr', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: deviceId})
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                document.getElementById('qr-image').src = data.qr_url + '?' + Date.now();
+                document.getElementById('qr-image').alt = 'QR Code for ' + deviceId;
+                document.getElementById('qr-link').href = data.device_url;
+                document.getElementById('qr-link').textContent = data.device_url;
+            })
+            .catch(function(error) {
+                alert('Error generating QR code: ' + error.message);
+                document.getElementById('qr-result').classList.add('hidden');
+                document.getElementById('qr-placeholder').classList.remove('hidden');
+            });
+        }
+        
+        // Enter key handlers
+        document.getElementById('main-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') performSearch();
+        });
+        
+        document.getElementById('qr-device-id').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') generateQR();
+        });
+    </script>
+</body>
+</html>
