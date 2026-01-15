@@ -30,7 +30,7 @@ class Config:
     """Flask application configuration."""
     
     # Security
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    # SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     
     # OpenAI API Settings
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
