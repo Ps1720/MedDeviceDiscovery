@@ -6,6 +6,7 @@ A Flask application that provides:
 - FDA GUDID integration for device lookup
 - AI-powered assistant for device questions
 - Mobile-friendly web interface
+- Category-based device organization
 
 STA Engineering Challenge 2026
 """
@@ -15,13 +16,25 @@ import json
 from pathlib import Path
 
 from config import Config
-from qr_generator import generate_qr_code, get_qr_code_path
+from database_setup import (
+    create_connection, init_db, add_qr_code, get_qr_code,
+    get_recent_qr_codes, get_qr_codes_by_category, get_all_categories,
+    search_qr_codes, update_qr_code_category, get_stats
+)
+from qr_generator import generate_qr_code, get_qr_code_path, get_or_create_qr_code, infer_category
 from llm_service import ask_device_question, get_quick_questions
 from gudid_service import get_device_from_gudid, parse_udi, search_devices
 
-# Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)
+
+
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+
+# Initialize database on startup
+init_db()
 
 
 # ============================================
@@ -47,18 +60,39 @@ DEVICES = load_devices()
 
 @app.route("/")
 def index():
-    """Home page - shows all devices and their QR codes."""
-    # Generate QR codes for all local devices
-    for device_id in DEVICES.keys():
-        generate_qr_code(device_id)
-    
-    return render_template(
-        "index.html",
-        devices=DEVICES,
-        base_url=Config.BASE_URL,
-        local_ip=Config.LOCAL_IP,
-        port=Config.PORT
-    )
+    """Home page - shows QR generator and recent/categorized devices."""
+    conn = create_connection()
+    try:
+        # Get recent QR codes
+        recent_qr_codes = get_recent_qr_codes(conn, limit=5)
+        
+        # Get all categories with counts
+        categories = get_all_categories(conn)
+        
+        # Get stats
+        stats = get_stats(conn)
+        
+        # Get devices grouped by category
+        devices_by_category = {}
+        all_qr_codes = get_qr_codes_by_category(conn)
+        for qr in all_qr_codes:
+            cat = qr.get('category', 'Uncategorized')
+            if cat not in devices_by_category:
+                devices_by_category[cat] = []
+            devices_by_category[cat].append(qr)
+        
+        return render_template(
+            "index.html",
+            recent_qr_codes=recent_qr_codes,
+            categories=categories,
+            devices_by_category=devices_by_category,
+            stats=stats,
+            base_url=Config.BASE_URL,
+            local_ip=Config.LOCAL_IP,
+            port=Config.PORT
+        )
+    finally:
+        conn.close()
 
 
 @app.route("/device/<device_id>")
@@ -102,6 +136,22 @@ def device_page(device_id):
     device["source"] = source
     quick_questions = get_quick_questions(device.get("type", ""))
     
+    # Ensure QR code exists in database for this device
+    conn = create_connection()
+    try:
+        existing = get_qr_code(conn, device_id)
+        if not existing:
+            category = infer_category(device)
+            get_or_create_qr_code(device_id, {
+                'device_name': device.get('brand_name') or device.get('model'),
+                'manufacturer': device.get('manufacturer'),
+                'category': category,
+                'type': device.get('type'),
+                'source': source
+            })
+    finally:
+        conn.close()
+    
     return render_template(
         "device.html",
         device=device,
@@ -116,16 +166,131 @@ def scan_page():
 
 
 # ============================================
-# API ROUTES
+# API ROUTES - QR CODES
+# ============================================
+
+@app.route("/generate-qr", methods=["POST"])
+def generate_new_qr():
+    """Generate a QR code for a device ID."""
+    data = request.get_json()
+    device_id = data.get("device_id", "").strip()
+    
+    if not device_id:
+        return jsonify({"error": "No device_id provided"}), 400
+    
+    # Get optional device info
+    device_name = data.get("device_name")
+    manufacturer = data.get("manufacturer")
+    category = data.get("category", "Uncategorized")
+    
+    # Try to get device info from GUDID if not provided
+    if not device_name or not manufacturer:
+        gudid_device = get_device_from_gudid(device_id)
+        if gudid_device:
+            device_name = device_name or gudid_device.get('brand_name') or gudid_device.get('model')
+            manufacturer = manufacturer or gudid_device.get('manufacturer')
+            category = infer_category(gudid_device)
+    
+    # Generate QR code
+    result = get_or_create_qr_code(device_id, {
+        'device_name': device_name,
+        'manufacturer': manufacturer,
+        'category': category,
+        'source': 'gudid' if manufacturer else 'manual'
+    })
+    
+    return jsonify({
+        "device_id": result.get('device_id'),
+        "qr_url": result.get('qr_url'),
+        "device_url": result.get('device_url'),
+        "device_name": result.get('device_name'),
+        "manufacturer": result.get('manufacturer'),
+        "category": result.get('category'),
+        "from_db": result.get('from_db', False)
+    })
+
+
+@app.route("/qr/<device_id>")
+def get_qr_code_image(device_id):
+    """Serve the QR code image for a device."""
+    qr_path = get_qr_code_path(device_id)
+    return send_file(qr_path, mimetype="image/png")
+
+
+@app.route("/api/qr/recent")
+def get_recent_qr_api():
+    """Get recently generated QR codes."""
+    limit = request.args.get("limit", 5, type=int)
+    limit = min(limit, 20)  # Cap at 20
+    
+    conn = create_connection()
+    try:
+        recent = get_recent_qr_codes(conn, limit=limit)
+        return jsonify({"qr_codes": recent, "count": len(recent)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/qr/category/<category>")
+def get_qr_by_category(category):
+    """Get QR codes by category."""
+    conn = create_connection()
+    try:
+        qr_codes = get_qr_codes_by_category(conn, category)
+        return jsonify({"category": category, "qr_codes": qr_codes, "count": len(qr_codes)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/qr/<device_id>/category", methods=["PUT"])
+def update_qr_category(device_id):
+    """Update the category of a QR code."""
+    data = request.get_json()
+    new_category = data.get("category")
+    
+    if not new_category:
+        return jsonify({"error": "No category provided"}), 400
+    
+    conn = create_connection()
+    try:
+        success = update_qr_code_category(conn, device_id, new_category)
+        if success:
+            return jsonify({"success": True, "device_id": device_id, "category": new_category})
+        return jsonify({"error": "QR code not found"}), 404
+    finally:
+        conn.close()
+
+
+@app.route("/api/categories")
+def get_categories_api():
+    """Get all categories with device counts."""
+    conn = create_connection()
+    try:
+        categories = get_all_categories(conn)
+        return jsonify({"categories": categories})
+    finally:
+        conn.close()
+
+
+@app.route("/api/stats")
+def get_stats_api():
+    """Get database statistics."""
+    conn = create_connection()
+    try:
+        stats = get_stats(conn)
+        return jsonify(stats)
+    finally:
+        conn.close()
+
+
+# ============================================
+# API ROUTES - DEVICE LOOKUP
 # ============================================
 
 @app.route("/api/lookup/udi", methods=["POST"])
 def lookup_by_udi():
     """
     Look up device by UDI barcode scan.
-    
-    Parses the UDI to extract the Device Identifier (DI),
-    then looks up the device in GUDID.
     """
     data = request.get_json()
     udi = data.get("udi", "").strip()
@@ -192,34 +357,42 @@ def search_device():
     if not query:
         return jsonify({"error": "No search query provided"}), 400
     
-    # Search local database
-    local_results = []
-    query_lower = query.lower()
-    for device_id, device in DEVICES.items():
-        searchable = f"{device.get('manufacturer', '')} {device.get('model', '')} {device.get('description', '')}".lower()
-        if query_lower in searchable:
-            local_results.append({**device, "id": device_id, "source": "local"})
-    
-    # Search GUDID
-    gudid_results = []
-    gudid_response = search_devices(query, limit=5)
-    if gudid_response and gudid_response.get("results"):
-        for result in gudid_response["results"]:
-            gudid_results.append({
-                "id": result.get("primaryDi", ""),
-                "manufacturer": result.get("companyName", ""),
-                "model": result.get("versionModelNumber", ""),
-                "brand_name": result.get("brandName", ""),
-                "description": result.get("deviceDescription", ""),
-                "source": "gudid"
-            })
-    
-    return jsonify({
-        "query": query,
-        "local_results": local_results,
-        "gudid_results": gudid_results,
-        "total": len(local_results) + len(gudid_results)
-    })
+    conn = create_connection()
+    try:
+        # First search our local QR code database
+        db_results = search_qr_codes(conn, query)
+        
+        # Search local devices JSON
+        local_results = []
+        query_lower = query.lower()
+        for device_id, device in DEVICES.items():
+            searchable = f"{device.get('manufacturer', '')} {device.get('model', '')} {device.get('description', '')}".lower()
+            if query_lower in searchable:
+                local_results.append({**device, "id": device_id, "source": "local"})
+        
+        # Search GUDID
+        gudid_results = []
+        gudid_response = search_devices(query, limit=5)
+        if gudid_response and gudid_response.get("results"):
+            for result in gudid_response["results"]:
+                gudid_results.append({
+                    "id": result.get("primaryDi", ""),
+                    "manufacturer": result.get("companyName", ""),
+                    "model": result.get("versionModelNumber", ""),
+                    "brand_name": result.get("brandName", ""),
+                    "description": result.get("deviceDescription", ""),
+                    "source": "gudid"
+                })
+        
+        return jsonify({
+            "query": query,
+            "db_results": db_results,  # QR codes already in our database
+            "local_results": local_results,  # From devices.json
+            "gudid_results": gudid_results,  # From FDA GUDID
+            "total": len(db_results) + len(local_results) + len(gudid_results)
+        })
+    finally:
+        conn.close()
 
 
 @app.route("/api/device/<device_id>")
@@ -261,13 +434,6 @@ def ask_question():
     })
 
 
-@app.route("/qr/<device_id>")
-def get_qr_code(device_id):
-    """Serve the QR code image for a device."""
-    qr_path = get_qr_code_path(device_id)
-    return send_file(qr_path, mimetype="image/png")
-
-
 @app.route("/api/devices")
 def list_devices():
     """List all available devices in local database."""
@@ -281,40 +447,6 @@ def list_devices():
     })
 
 
-@app.route("/generate-qr", methods=["POST"])
-def generate_new_qr():
-    """Generate a QR code for a custom device ID."""
-    data = request.get_json()
-    device_id = data.get("device_id")
-    
-    if not device_id:
-        return jsonify({"error": "No device_id provided"}), 400
-    
-    # Sanitize device_id
-    device_id = device_id.lower().replace(" ", "_")
-    
-    # Generate QR code
-    generate_qr_code(device_id)
-    
-    return jsonify({
-        "device_id": device_id,
-        "qr_url": f"/qr/{device_id}",
-        "device_url": f"{Config.BASE_URL}/device/{device_id}"
-    })
-
-
-# ============================================
-# HEALTH CHECK
-# ============================================
-
-@app.route("/health")
-def health_check():
-    """Health check endpoint for Docker/monitoring."""
-    return jsonify({
-        "status": "healthy",
-        "service": "med-device-discovery",
-        "base_url": Config.BASE_URL
-    })
 @app.route("/api/recalls/check/<device_id>")
 def check_device_recalls(device_id):
     """Check FDA openFDA API for recalls related to this device's manufacturer."""
@@ -367,6 +499,27 @@ def check_device_recalls(device_id):
     except Exception as e:
         return jsonify({"error": str(e), "recalls": []}), 500
 
+
+# ============================================
+# HEALTH CHECK
+# ============================================
+
+@app.route("/health")
+def health_check():
+    """Health check endpoint for Docker/monitoring."""
+    conn = create_connection()
+    try:
+        stats = get_stats(conn)
+        return jsonify({
+            "status": "healthy",
+            "service": "med-device-discovery",
+            "base_url": Config.BASE_URL,
+            "stats": stats
+        })
+    finally:
+        conn.close()
+
+
 # ============================================
 # MAIN
 # ============================================
@@ -384,6 +537,7 @@ if __name__ == "__main__":
 ║  • Scan existing UDI barcodes on devices                   ║
 ║  • Auto-lookup in FDA GUDID database                       ║
 ║  • AI-powered assistance for any device                    ║
+║  • Category-based device organization                      ║
 ║  • No app installation required                            ║
 ║                                                            ║
 ║  Make sure your phone is on the same WiFi network!         ║

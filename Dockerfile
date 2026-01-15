@@ -23,5 +23,5 @@ COPY . .
 # Create directory for QR codes
 RUN mkdir -p static/qr_codes
 
-# Run the application with gunicorn
-CMD sh -c "gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 app:app"
+# Run the application with gunicorn (reduced workers for 0.25 CPU)
+CMD sh -c "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 2 app:app"
