@@ -1,2 +1,7 @@
 #Ignore environment variable files
 .env
+static/qr_codes/00850044399178.png
+static/qr_codes/bd_alaris_8015.png
+static/qr_codes/draeger_apollo.png
+static/qr_codes/ge_b650.png
+static/qr_codes/philips_mx800.png

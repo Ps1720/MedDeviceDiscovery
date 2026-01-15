@@ -155,14 +155,43 @@
                     {% endif %}
                 </div>
                 
-                {% if device.commercial_status %}
-                <div class="flex-shrink-0">
+                <!-- Right Side: Status + QR Code -->
+                <div class="flex-shrink-0 flex flex-col items-end space-y-4">
+                    {% if device.commercial_status %}
                     <span class="inline-flex items-center {% if device.commercial_status == 'In Commercial Distribution' %}bg-secondary-500{% else %}bg-slate-400{% endif %} text-white text-xs font-medium px-4 py-2 rounded-full">
                         <span class="w-2 h-2 bg-white rounded-full mr-2 status-dot"></span>
                         {{ device.commercial_status }}
                     </span>
+                    {% endif %}
+                    
+                    <!-- QR Code Section -->
+                    <div class="bg-white rounded-2xl shadow-card border border-slate-100 p-4">
+                        <div class="flex items-start space-x-4">
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <img id="device-qr-code" src="/qr/{{ device.id }}" alt="Device QR Code" class="w-24 h-24">
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Scan to Access</p>
+                                <p class="text-xs text-slate-400 max-w-[140px] truncate font-mono">{{ device.id }}</p>
+                                
+                                <!-- Action Buttons Row -->
+                                <div class="flex items-center space-x-1.5 pt-1">
+                                    <button onclick="downloadQR()" class="flex items-center space-x-1 bg-primary-50 hover:bg-primary-100 text-primary-600 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors" title="Download QR">
+                                        <span class="material-icons-round text-sm">download</span>
+                                        <span class="hidden sm:inline">Download</span>
+                                    </button>
+                                    <button onclick="printLabel()" class="flex items-center space-x-1 bg-secondary-50 hover:bg-secondary-100 text-secondary-600 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors" title="Print Label">
+                                        <span class="material-icons-round text-sm">print</span>
+                                        <span class="hidden sm:inline">Print</span>
+                                    </button>
+                                    <button onclick="shareDevice()" class="flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 p-1.5 rounded-lg transition-colors" title="Share">
+                                        <span class="material-icons-round text-sm">share</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
             </div>
             
             {% if device.description %}
@@ -501,6 +530,39 @@
         </div>
     </div>
 
+    <!-- Print Label Modal -->
+    <div id="print-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-slate-900 flex items-center space-x-2">
+                    <span class="material-icons-round text-primary-600">print</span>
+                    <span>Print Device Label</span>
+                </h3>
+                <button onclick="closePrintModal()" class="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
+                    <span class="material-icons-round text-slate-400">close</span>
+                </button>
+            </div>
+            <div id="print-content" class="bg-white border-2 border-dashed border-slate-200 rounded-xl p-6 mb-4">
+                <div class="text-center">
+                    <img id="print-qr" src="/qr/{{ device.id }}" alt="QR Code" class="w-36 h-36 mx-auto mb-4 border border-slate-100 rounded-lg p-2">
+                    <p class="font-bold text-slate-900 text-lg">{{ device.brand_name or device.model }}</p>
+                    <p class="text-sm text-slate-500">{{ device.manufacturer }}</p>
+                    <p class="text-xs text-slate-400 mt-3 font-mono bg-slate-50 px-3 py-1.5 rounded-lg inline-block">{{ device.id }}</p>
+                </div>
+            </div>
+            <p class="text-xs text-slate-400 text-center mb-4">Scan QR code to view device information</p>
+            <div class="flex space-x-3">
+                <button onclick="closePrintModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-medium transition-colors">
+                    Cancel
+                </button>
+                <button onclick="doPrint()" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2">
+                    <span class="material-icons-round text-sm">print</span>
+                    <span>Print Label</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         var deviceId = "{{ device.id }}";
         var deviceName = "{{ device.brand_name or device.model }}";
@@ -512,6 +574,143 @@
             checkRecalls();
             updateNotificationStatus();
         });
+
+        // ============================================
+        // QR CODE FUNCTIONS
+        // ============================================
+        
+        function downloadQR() {
+            var link = document.createElement('a');
+            link.href = '/qr/' + deviceId;
+            link.download = 'qr-' + deviceId + '.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('QR code downloaded!');
+        }
+        
+        function shareDevice() {
+            var url = window.location.href;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: deviceName + ' - Medical Device Info',
+                    text: 'View device information for ' + deviceName + ' by ' + manufacturer,
+                    url: url
+                }).catch(function(err) {
+                    copyToClipboard(url);
+                });
+            } else {
+                copyToClipboard(url);
+            }
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                showToast('Link copied to clipboard!');
+            }).catch(function() {
+                prompt('Copy this link:', text);
+            });
+        }
+        
+        function showToast(message) {
+            var toast = document.createElement('div');
+            toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm shadow-lg z-50 transition-opacity duration-300';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(function() {
+                toast.style.opacity = '0';
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 2000);
+        }
+        
+        function printLabel() {
+            document.getElementById('print-modal').classList.remove('hidden');
+        }
+        
+        function closePrintModal() {
+            document.getElementById('print-modal').classList.add('hidden');
+        }
+        
+        function doPrint() {
+            var printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Device Label - ${deviceName}</title>
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            display: flex; 
+                            justify-content: center; 
+                            align-items: center; 
+                            min-height: 100vh;
+                            padding: 20px;
+                        }
+                        .label {
+                            border: 2px solid #e2e8f0;
+                            border-radius: 12px;
+                            padding: 24px;
+                            text-align: center;
+                            max-width: 300px;
+                        }
+                        .qr-code {
+                            width: 150px;
+                            height: 150px;
+                            margin: 0 auto 16px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            padding: 8px;
+                        }
+                        .device-name {
+                            font-weight: bold;
+                            font-size: 16px;
+                            color: #1e293b;
+                            margin-bottom: 4px;
+                        }
+                        .manufacturer {
+                            font-size: 14px;
+                            color: #64748b;
+                            margin-bottom: 12px;
+                        }
+                        .device-id {
+                            font-size: 11px;
+                            color: #94a3b8;
+                            font-family: monospace;
+                            background: #f8fafc;
+                            padding: 6px 12px;
+                            border-radius: 6px;
+                            display: inline-block;
+                        }
+                        .scan-text {
+                            font-size: 10px;
+                            color: #94a3b8;
+                            margin-top: 12px;
+                        }
+                        @media print {
+                            body { padding: 0; }
+                            .label { border: 1px solid #ccc; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="label">
+                        <img src="/qr/${deviceId}" class="qr-code" alt="QR Code">
+                        <div class="device-name">${deviceName}</div>
+                        <div class="manufacturer">${manufacturer}</div>
+                        <div class="device-id">${deviceId}</div>
+                        <div class="scan-text">Scan QR code for device info</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            setTimeout(function() {
+                printWindow.print();
+            }, 250);
+            closePrintModal();
+        }
 
         // ============================================
         // CHAT
@@ -648,7 +847,7 @@
         }
 
         // ============================================
-        // CHAT
+        // CHAT MESSAGES
         // ============================================
         
         function addMessage(text, role) {

@@ -150,9 +150,7 @@ def ask_device_question(device: dict, question: str, chat_history: list = None) 
     try:
         response = api_client.chat.completions.create(
             model=Config.OPENAI_MODEL,
-            messages=messages,
-            max_tokens=1024,
-            temperature=0.7
+            messages=messages
         )
         
         return response.choices[0].message.content
