@@ -50,6 +50,6 @@ class Config:
     QR_CODE_DIR = "static/qr_codes"
     DEVICES_FILE = "data/devices.json"
     
-    # GUDID API settings
-    GUDID_BASE_URL = "https://accessgudid.nlm.nih.gov/api/v2"
+    # GUDID API settings (FIXED: v2 -> v3)
+    GUDID_BASE_URL = "https://accessgudid.nlm.nih.gov/api/v3"
     GUDID_TIMEOUT = 10  # seconds
