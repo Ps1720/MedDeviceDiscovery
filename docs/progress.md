@@ -187,3 +187,39 @@ recalls guarantee the workflow lights up.
 Class I) are illustrative, not actual FDA recalls.
 
 ---
+
+## Phase 4 — Implant Timeline View  *(2026-05-19, complete)*
+
+*(Built after Phase 5; the patient-chart redesign covered the layout, this phase added the
+clinical depth.)*
+
+**Goal:** A clinically useful pre-op view — devices grouped/colored by type with the safety
+information anesthesiologists actually act on.
+
+**What was done:**
+- **Device.safety on the FHIR Device:** the mapper now emits `Device.safety` CodeableConcepts for
+  **MRI status, latex (contains / not-made-with), single-use, and sterile**, sourced from GUDID
+  safety attributes (tagged with a local `device-safety` code system). Validated: still **0 errors**
+  against US Core v8.0.1.
+- **Patient chart redesign** (earlier): full-width layout, patient header with a person-icon avatar
+  on the left + demographic bio (ID, MRN, sex, age, DOB) from the FHIR Patient resource, and a
+  responsive device grid.
+- **Category color-coding:** each card is classified (cardiac / neuro / ortho / vascular /
+  ophthalmic / general) from the device name + GMDN term, with a colored top accent + category pill.
+- **GMDN term** (with code when present) shown on each card.
+- **Safety chips:** MRI status, latex, single-use, sterile rendered as colored chips (MR status is
+  the headline one for perioperative/MRI decisions).
+- Recalled cards keep a red/amber ring + badge + reason; the recall banner stays at the top.
+- Empty-state message when a patient has no devices.
+
+**Verification:**
+- Documenting the Abbott XIENCE now yields `category=cardiac` and `safety=[MR Conditional,
+  Single use, Sterile]` straight from GUDID; timeline renders (HTTP 200).
+- Mapper tests still 12 pass / 5 live-validation; all 5 samples remain US Core-valid with safety added.
+
+**Note:** "implant date" isn't separately captured (GUDID has no implant date — that's a Procedure
+concern); cards show manufacture/expiry where available plus the documentation timestamp. Devices
+documented before this phase show no safety chips (created without `Device.safety`); re-documenting
+populates them.
+
+---

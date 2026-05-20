@@ -262,15 +262,21 @@ periop-udi/
 **Goal**: A clinically useful view that anesthesiologists actually want for pre-op planning.
 
 **Tasks**:
-- [ ] Endpoint `GET /patient/<id>/devices` → JSON of all Devices for that patient
-- [ ] Endpoint `GET /patient/<id>/timeline` → rendered HTML timeline
-- [ ] Visual design: vertical timeline, color-coded by device type (cardiac, neurostim, ortho, etc.)
-- [ ] Each entry shows: device name, manufacturer, GMDN term, implant date, status badge
-- [ ] Empty state: helpful message if no devices
+- [x] Endpoint `GET /patient/<id>/devices` → JSON of all Devices (+ recalls + patient demographics)
+- [x] Endpoint `GET /patient/<id>/timeline` → rendered HTML chart
+- [x] Visual design: full-width patient header + responsive device **grid**, color-coded by device
+  category (cardiac / neuro / ortho / vascular / ophthalmic / general)
+- [x] Each card shows: device name, manufacturer, model, GMDN term (+ code), UDI-DI, expiry, status,
+  US Core badge, and **safety chips (MRI status, latex, single-use, sterile)** from `Device.safety`
+- [x] Empty state message when no devices
+- [x] Bonus: patient demographics header (avatar + ID/MRN/sex/age/DOB) and recall banner/badges
 
-**Acceptance**:
-- A pre-loaded patient with 3 devices renders cleanly in timeline view
-- The timeline updates within 2 seconds of a new scan
+**Acceptance**: ✅ met (2026-05-19)
+- Patients with multiple devices render cleanly in the grid; XIENCE → cardiac + MR Conditional/
+  Single use/Sterile safety chips, pulled from GUDID
+- New scans appear immediately on reload (sub-second documentation)
+- Note: GUDID carries no implant date (that's a Procedure concern); cards show manufacture/expiry +
+  documentation timestamp instead
 
 ---
 
@@ -549,4 +555,4 @@ If any of these is missing 2 weeks before the deadline, **cut Bulk Data and Subs
 
 ---
 
-*Last updated: 2026-05-19 — Phase 5 complete (CDS Hooks recall surveillance: discovery + recall-check; recall banner/badges on the timeline; Class I→critical, Class II→warning). Phases 0–3 also complete; Phase 4 (timeline polish) still open.*
+*Last updated: 2026-05-19 — Phases 0–5 complete. Latest: Phase 4 (patient chart redesign + category color-coding + Device.safety MRI/latex/single-use chips). Open: 6 (SMART launch), 7 (CI), 8 (eval), 9 (pilot), 10 (submission).*

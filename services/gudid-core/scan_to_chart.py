@@ -306,22 +306,56 @@ def get_patient_recall_cards(patient_id: str) -> list[dict]:
         return []
 
 
+_CATEGORY_RULES = [
+    ("cardiac", ("stent", "coronary", "cardiac", "valve", "pacemaker", "defibrillator",
+                 "icd", "heart", "aortic", "mitral")),
+    ("neuro", ("neuro", "deep brain", "spinal cord stim", "stimulator", "pulse generator",
+               "shunt")),
+    ("ortho", ("hip", "knee", "joint", "femoral", "spine", "spinal", "bone", "ortho",
+               "prosthesis", "screw", "plate")),
+    ("vascular", ("graft", "catheter", "vascular", "filter", "balloon")),
+    ("ophthalmic", ("lens", "intraocular", "ophthalmic", "retinal")),
+]
+
+
+def _categorize(*texts: Optional[str]) -> str:
+    blob = " ".join(t for t in texts if t).lower()
+    for category, keywords in _CATEGORY_RULES:
+        if any(k in blob for k in keywords):
+            return category
+    return "general"
+
+
 def _simplify_device(device: dict) -> dict:
     names = device.get("deviceName") or []
     name = names[0].get("name") if names else None
-    dtype = device.get("type", {})
-    type_text = dtype.get("text") if isinstance(dtype, dict) else None
+    dtype = device.get("type", {}) if isinstance(device.get("type"), dict) else {}
+    type_text = dtype.get("text")
+    gmdn_code = None
+    for c in dtype.get("coding") or []:
+        if c.get("code"):
+            gmdn_code = c["code"]
+            break
     udi = (device.get("udiCarrier") or [{}])[0]
     profiles = (device.get("meta") or {}).get("profile") or []
+    safety = [
+        {"code": (c.get("coding") or [{}])[0].get("code"), "display": c.get("text") or
+         ((c.get("coding") or [{}])[0].get("display"))}
+        for c in (device.get("safety") or [])
+    ]
     return {
         "id": device.get("id"),
         "name": name or type_text or "Device",
         "type": type_text,
+        "gmdn_code": gmdn_code,
+        "category": _categorize(name, type_text),
         "manufacturer": device.get("manufacturer"),
         "model": device.get("modelNumber"),
         "device_identifier": udi.get("deviceIdentifier"),
         "expiration_date": device.get("expirationDate"),
+        "manufacture_date": device.get("manufactureDate"),
         "status": device.get("status"),
+        "safety": safety,
         "last_updated": (device.get("meta") or {}).get("lastUpdated"),
         "us_core": US_CORE_IMPLANTABLE_DEVICE in profiles,
         "recall_flag": False,  # set True by get_patient_chart when a recall matches

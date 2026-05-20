@@ -23,6 +23,10 @@ US_CORE_IMPLANTABLE_DEVICE = (
 # Registered OID for the Global Medical Device Nomenclature code system.
 GMDN_SYSTEM = "urn:oid:2.16.840.1.113883.6.257"
 
+# Local code system used to tag Device.safety entries so the UI can render them
+# (MRI status, latex, single-use, sterile come from GUDID safety attributes).
+SAFETY_SYSTEM = "https://periop-udi.local/fhir/CodeSystem/device-safety"
+
 # FHIR NamingSystem URIs for the common UDI issuing agencies.
 _ISSUER_SYSTEMS = {
     "GS1": "http://hl7.org/fhir/NamingSystem/gs1",
@@ -158,6 +162,11 @@ def map_to_device(
     # ---- Device.type from GMDN (REQUIRED by US Core: min=1) ----
     device["type"] = _device_type(gudid_record)
 
+    # ---- Device.safety (MRI status, latex, single-use, sterile) ----
+    safety = _safety(gudid_record)
+    if safety:
+        device["safety"] = safety
+
     # ---- Patient linkage (Must Support; references US Core Patient) ----
     pid = _clean(patient_id)
     if pid:
@@ -194,3 +203,37 @@ def _device_type(gudid_record: dict) -> dict:
         concept["coding"] = [coding]
     concept["text"] = text or (coding.get("display") if coding else None) or _DEFAULT_TYPE_TEXT
     return concept
+
+
+def _safety_concept(code: str, display: str) -> dict:
+    return {"coding": [{"system": SAFETY_SYSTEM, "code": code, "display": display}], "text": display}
+
+
+def _safety(gudid_record: dict) -> list[dict]:
+    """Build Device.safety CodeableConcepts from GUDID safety attributes."""
+    out: list[dict] = []
+
+    mri = _clean(gudid_record.get("mri_safety"))
+    if mri and mri.lower() not in ("unknown", ""):
+        out.append(_safety_concept("mri", f"MRI: {mri}"))
+
+    # Latex: GUDID exposes both "contains" and "not made with" flags.
+    if _is_true(gudid_record.get("contains_latex")):
+        out.append(_safety_concept("latex", "Contains natural rubber latex"))
+    elif _is_true(gudid_record.get("no_latex")):
+        out.append(_safety_concept("no-latex", "Not made with natural rubber latex"))
+
+    if _is_true(gudid_record.get("single_use")):
+        out.append(_safety_concept("single-use", "Single use"))
+
+    if _is_true(gudid_record.get("sterile")):
+        out.append(_safety_concept("sterile", "Sterile"))
+
+    return out
+
+
+def _is_true(value: Any) -> bool:
+    """GUDID booleans arrive as bools or 'true'/'false' strings."""
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() == "true"

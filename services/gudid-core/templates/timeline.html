@@ -82,11 +82,29 @@
             bannerEl.classList.remove('hidden');
         }
 
+        const CATEGORY = {
+            cardiac:    { bar: 'bg-rose-500',   pill: 'bg-rose-100 text-rose-700',     label: 'Cardiac' },
+            neuro:      { bar: 'bg-violet-500', pill: 'bg-violet-100 text-violet-700', label: 'Neuro' },
+            ortho:      { bar: 'bg-amber-500',  pill: 'bg-amber-100 text-amber-700',   label: 'Orthopedic' },
+            vascular:   { bar: 'bg-teal-500',   pill: 'bg-teal-100 text-teal-700',     label: 'Vascular' },
+            ophthalmic: { bar: 'bg-cyan-500',   pill: 'bg-cyan-100 text-cyan-700',     label: 'Ophthalmic' },
+            general:    { bar: 'bg-slate-400',  pill: 'bg-slate-100 text-slate-600',   label: 'General' },
+        };
+        const SAFETY_STYLE = {
+            'mri':        'bg-indigo-100 text-indigo-700',
+            'latex':      'bg-red-100 text-red-700',
+            'no-latex':   'bg-emerald-100 text-emerald-700',
+            'single-use': 'bg-slate-100 text-slate-600',
+            'sterile':    'bg-sky-100 text-sky-700',
+        };
+
         function deviceCard(d) {
+            const cat = CATEGORY[d.category] || CATEGORY.general;
             const recalled = d.recall_flag;
             const critical = recalled && d.recall && d.recall.indicator === 'critical';
-            const topBar = recalled ? (critical ? 'bg-red-500' : 'bg-amber-500')
-                : (d.us_core ? 'bg-blue-500' : 'bg-slate-300');
+            const cardBorder = recalled ? (critical ? 'border-red-300 ring-2 ring-red-200'
+                                                     : 'border-amber-300 ring-2 ring-amber-200')
+                                        : 'border-slate-200';
             const recallBadge = recalled
                 ? badge(`RECALL · ${(d.recall && d.recall.classification) || ''}`,
                         critical ? 'bg-red-600 text-white' : 'bg-amber-500 text-white') : '';
@@ -94,24 +112,32 @@
                 <div class="mt-3 text-sm rounded-lg p-2.5 ${critical ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'}">
                     <span class="font-semibold">FDA recall ${d.recall.recall_number || ''}:</span> ${d.recall.reason || ''}
                 </div>` : '';
+            const gmdn = d.type ? `${d.type}${d.gmdn_code ? ` <span class="text-slate-400">(GMDN ${d.gmdn_code})</span>` : ''}` : '—';
+            const safetyChips = (d.safety || [])
+                .filter(s => s.display)
+                .map(s => badge(s.display, SAFETY_STYLE[s.code] || 'bg-slate-100 text-slate-600'))
+                .join(' ');
             return `
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div class="h-1.5 ${topBar}"></div>
+            <div class="bg-white rounded-2xl shadow-sm border ${cardBorder} overflow-hidden flex flex-col">
+                <div class="h-1.5 ${cat.bar}"></div>
                 <div class="p-4 flex flex-col h-full">
                     <div class="flex items-start justify-between gap-2">
                         <h3 class="font-semibold text-slate-800 leading-snug">${d.name}</h3>
                         ${d.us_core ? badge('US Core', 'bg-blue-100 text-blue-700') : badge('EHR', 'bg-slate-100 text-slate-500')}
                     </div>
                     <div class="flex flex-wrap gap-1 mt-2">
+                        ${badge(cat.label, cat.pill)}
                         ${recallBadge}
                         ${badge(d.status || 'unknown', 'bg-slate-100 text-slate-600')}
                     </div>
-                    <dl class="text-sm text-slate-600 mt-3 space-y-1">
+                    <p class="text-sm text-slate-500 mt-3">${gmdn}</p>
+                    <dl class="text-sm text-slate-600 mt-2 space-y-1">
                         <div class="flex justify-between gap-2"><dt class="text-slate-400">Manufacturer</dt><dd class="text-right">${d.manufacturer || '—'}</dd></div>
                         <div class="flex justify-between gap-2"><dt class="text-slate-400">Model</dt><dd class="text-right">${d.model || '—'}</dd></div>
                         <div class="flex justify-between gap-2"><dt class="text-slate-400">UDI-DI</dt><dd class="text-right font-mono text-xs">${d.device_identifier || '—'}</dd></div>
                         <div class="flex justify-between gap-2"><dt class="text-slate-400">Expires</dt><dd class="text-right">${(d.expiration_date || '—').split('T')[0]}</dd></div>
                     </dl>
+                    ${safetyChips ? `<div class="flex flex-wrap gap-1 mt-3">${safetyChips}</div>` : ''}
                     ${recallDetail}
                     <div class="text-xs text-slate-400 mt-auto pt-3">
                         <a class="text-blue-600 hover:underline" href="${d.fhir_url}" target="_blank">FHIR Device/${d.id}</a>
