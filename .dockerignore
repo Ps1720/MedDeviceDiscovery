@@ -26,3 +26,10 @@ htmlcov/
 dist/
 build/
 static/qr_codes/*.png
+services/gudid-core/static/qr_codes/*.png
+
+# Keep the build context lean when building from the repo root
+infrastructure/synthea/*.jar
+infrastructure/synthea/output/
+infrastructure/hapi/data/
+eval/usage_logs/*.csv

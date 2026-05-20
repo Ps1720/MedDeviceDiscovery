@@ -110,3 +110,43 @@ isn't loaded into HAPI's terminology, so GMDN codings raise *warnings* ("code sy
 not errors — conformance still passes.
 
 ---
+
+## Phase 3 — Scan-to-Chart Workflow  *(2026-05-19, complete)*
+
+**Goal:** The hero demo. UDI scan → GUDID lookup → US Core Device created → linked to a patient,
+end-to-end in seconds, with the result visible on a patient timeline.
+
+**What was done:**
+- **Wired fhir-bridge into the app:** `gudid-core` is now built from the **repo root**
+  (`docker-compose.yml` build `context: .`, `dockerfile: services/gudid-core/Dockerfile`) so the
+  image bakes in `gudid_to_uscore_device.py` and `hapi_client.py`. Root `.dockerignore` trimmed to
+  keep the context lean (excludes the Synthea jar, etc.). The dev service bind-mounts the two
+  modules instead.
+- `services/gudid-core/scan_to_chart.py` — orchestration: `document_device()` (parse UDI → GUDID
+  lookup → `map_to_device` → `create_device` → optional `link_to_procedure` → CSV log),
+  `list_patients()` (picker feed), `get_patient_timeline()` (simplified, newest-first devices).
+- New Flask routes in `app.py`: `GET/POST /scan-to-chart`, `GET /api/patients`,
+  `GET /patient/<id>/devices`, `GET /patient/<id>/timeline`.
+- Templates: `scan_to_chart.html` (UDI input + live patient picker + result panel) and
+  `timeline.html` (per-patient device cards, US Core / recall / status badges). Added a
+  **"Document to Chart"** button to the home page header.
+- Every operation is logged to `eval/usage_logs/scans.csv` (timestamp, user, udi,
+  device_identifier, patient_id, device_id, time_to_complete_ms, success).
+
+**Verification (against live FDA GUDID + running HAPI):**
+- Documented a real Abbott **XIENCE ALPINE** drug-eluting stent (DI `08717648200274`) to patient
+  1602 → US Core `Device/90152` created; round-trip **~0.7–1.4 s** (well under the 15 s target).
+- `GET /patient/1602/devices` returns the new US-Core device **first** (newest), alongside the
+  patient's pre-existing generic Synthea devices — the `us_core` badge distinguishes them.
+- Not-found path is graceful: a DI GUDID 404s on → `{"success": false, "error": "Device … not
+  found in FDA GUDID"}`.
+- All pages return HTTP 200; FHIR links use a browser-reachable base (`PUBLIC_FHIR_BASE_URL`).
+
+**Decisions / notes:**
+- **Port:** `gudid-core` runs on host **8090** (macOS AirPlay Receiver holds 5000).
+- **Display URLs:** the container reaches HAPI at `http://hapi:8080` (internal) but renders links
+  with `PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir` so they work in the browser.
+- The existing GUDID `/scan` + device-info flow is untouched; scan-to-chart is additive.
+- `scans.csv` is gitignored (eval data populated at runtime).
+
+---

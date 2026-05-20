@@ -41,6 +41,7 @@ services:
         condition: service_started
     environment:
       - FHIR_BASE_URL=http://hapi:8080/fhir
+      - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
       - PATIENT_COUNT=${PATIENT_COUNT:-50}
     volumes:
       - ./infrastructure/synthea:/synthea-work
@@ -48,8 +49,11 @@ services:
       - seed
 
   # ---- GUDID core app (existing STA app; moved off 8080) ----
+  # Built from the repo root so the image includes the fhir-bridge modules.
   gudid-core:
-    build: ./services/gudid-core
+    build:
+      context: .
+      dockerfile: services/gudid-core/Dockerfile
     container_name: periop-udi-gudid-core
     ports:
       - "8090:8090"
@@ -62,13 +66,17 @@ services:
       - PORT=8090
       - FLASK_ENV=${FLASK_ENV:-production}
       - FHIR_BASE_URL=http://hapi:8080/fhir
+      - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
     volumes:
       - ./services/gudid-core/static/qr_codes:/app/static/qr_codes
       - ./services/gudid-core/data:/app/data
+      - ./eval/usage_logs:/app/eval/usage_logs
     restart: unless-stopped
 
   gudid-core-dev:
-    build: ./services/gudid-core
+    build:
+      context: .
+      dockerfile: services/gudid-core/Dockerfile
     container_name: periop-udi-gudid-core-dev
     ports:
       - "8090:8090"
@@ -81,8 +89,12 @@ services:
       - PORT=8090
       - FLASK_ENV=development
       - FHIR_BASE_URL=http://hapi:8080/fhir
+      - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
     volumes:
       - ./services/gudid-core:/app
+      - ./services/fhir-bridge/gudid_to_uscore_device.py:/app/gudid_to_uscore_device.py
+      - ./services/fhir-bridge/hapi_client.py:/app/hapi_client.py
+      - ./eval/usage_logs:/app/eval/usage_logs
     command: python app.py
     profiles:
       - dev

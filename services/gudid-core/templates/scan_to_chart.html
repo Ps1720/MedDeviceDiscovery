@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeriopUDI — Document Device to Chart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <div class="max-w-2xl mx-auto p-6">
+        <header class="mb-6">
+            <h1 class="text-2xl font-bold text-slate-800">Document Device to Chart</h1>
+            <p class="text-slate-500">Scan a UDI, pick a patient, and write a US Core Implantable
+            Device to their FHIR chart.</p>
+        </header>
+
+        <div class="bg-white rounded-xl shadow p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">UDI / Device Identifier</label>
+                <input id="udi" type="text" placeholder="e.g. 08717648200274 or full (01)... UDI"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Patient</label>
+                <select id="patient"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="">Loading patients…</option>
+                </select>
+            </div>
+
+            <button id="document-btn"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50">
+                Document Device
+            </button>
+        </div>
+
+        <div id="result" class="mt-6 hidden"></div>
+    </div>
+
+    <script>
+        const patientSelect = document.getElementById('patient');
+        const resultBox = document.getElementById('result');
+        const btn = document.getElementById('document-btn');
+
+        async function loadPatients() {
+            try {
+                const res = await fetch('/api/patients?limit=100');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                patientSelect.innerHTML = '<option value="">Select a patient…</option>' +
+                    data.patients.map(p => `<option value="${p.id}">${p.name} (id ${p.id})</option>`).join('');
+            } catch (e) {
+                patientSelect.innerHTML = `<option value="">Could not load patients: ${e.message}</option>`;
+            }
+        }
+
+        function show(html, ok) {
+            resultBox.className = 'mt-6 rounded-xl shadow p-5 ' +
+                (ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200');
+            resultBox.innerHTML = html;
+            resultBox.classList.remove('hidden');
+        }
+
+        async function documentDevice() {
+            const udi = document.getElementById('udi').value.trim();
+            const patient_id = patientSelect.value;
+            if (!udi) return show('<p class="text-red-700">Enter a UDI or Device Identifier.</p>', false);
+            if (!patient_id) return show('<p class="text-red-700">Select a patient.</p>', false);
+
+            btn.disabled = true; btn.textContent = 'Documenting…';
+            const started = performance.now();
+            try {
+                const res = await fetch('/scan-to-chart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ udi, patient_id })
+                });
+                const data = await res.json();
+                const ms = Math.round(performance.now() - started);
+                if (data.success) {
+                    show(`
+                        <h2 class="text-lg font-semibold text-green-800 mb-2">✓ Device documented in ${ms} ms</h2>
+                        <dl class="text-sm text-slate-700 space-y-1">
+                            <div><span class="font-medium">Device:</span> ${data.brand_name || '—'} (${data.type || '—'})</div>
+                            <div><span class="font-medium">Manufacturer:</span> ${data.manufacturer || '—'}</div>
+                            <div><span class="font-medium">UDI-DI:</span> ${data.device_identifier}</div>
+                            <div><span class="font-medium">FHIR Device:</span>
+                                <a class="text-blue-600 underline" href="${data.fhir_url}" target="_blank">${data.device_id}</a></div>
+                        </dl>
+                        <a href="/patient/${data.patient_id}/timeline"
+                           class="inline-block mt-4 bg-slate-800 text-white px-4 py-2 rounded-lg">View patient timeline →</a>
+                    `, true);
+                } else {
+                    show(`<h2 class="text-lg font-semibold text-red-800 mb-1">Could not document device</h2>
+                          <p class="text-red-700 text-sm">${data.error || 'Unknown error'}</p>`, false);
+                }
+            } catch (e) {
+                show(`<p class="text-red-700">Request failed: ${e.message}</p>`, false);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Document Device';
+            }
+        }
+
+        btn.addEventListener('click', documentDevice);
+        loadPatients();
+    </script>
+</body>
+</html>

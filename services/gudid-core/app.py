@@ -24,6 +24,11 @@ from database_setup import (
 from qr_generator import generate_qr_code, get_qr_code_path, get_or_create_qr_code, infer_category
 from llm_service import ask_device_question, get_quick_questions
 from gudid_service import get_device_from_gudid, parse_udi, search_devices
+from scan_to_chart import (
+    document_device,
+    list_patients,
+    get_patient_timeline,
+)
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -163,6 +168,57 @@ def device_page(device_id):
 def scan_page():
     """Page for scanning UDI barcodes directly from devices."""
     return render_template("scan.html", base_url=Config.BASE_URL)
+
+
+# ============================================
+# SCAN-TO-CHART WORKFLOW (Phase 3 — FHIR)
+# ============================================
+
+@app.route("/scan-to-chart")
+def scan_to_chart_page():
+    """The hero workflow: scan a UDI and document it to a patient's chart in FHIR."""
+    return render_template("scan_to_chart.html", base_url=Config.BASE_URL)
+
+
+@app.route("/scan-to-chart", methods=["POST"])
+def scan_to_chart_submit():
+    """
+    UDI -> GUDID lookup -> US Core Device -> written to the patient's chart in HAPI.
+    Body: { "udi": str, "patient_id": str, "procedure_id"?: str, "user"?: str }
+    """
+    data = request.get_json(silent=True) or {}
+    result = document_device(
+        udi=(data.get("udi") or "").strip(),
+        patient_id=(data.get("patient_id") or "").strip(),
+        procedure_id=(data.get("procedure_id") or "").strip() or None,
+        user=(data.get("user") or "demo").strip() or "demo",
+    )
+    return jsonify(result), (200 if result.get("success") else 400)
+
+
+@app.route("/api/patients")
+def api_patients():
+    """Patient-picker feed sourced live from HAPI."""
+    limit = min(request.args.get("limit", 50, type=int), 200)
+    try:
+        return jsonify({"patients": list_patients(limit=limit)})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Could not reach FHIR server: {exc}"}), 502
+
+
+@app.route("/patient/<patient_id>/devices")
+def api_patient_devices(patient_id):
+    """JSON list of a patient's documented devices (newest first)."""
+    try:
+        return jsonify({"patient_id": patient_id, "devices": get_patient_timeline(patient_id)})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Could not reach FHIR server: {exc}"}), 502
+
+
+@app.route("/patient/<patient_id>/timeline")
+def patient_timeline_page(patient_id):
+    """Rendered implant/device timeline for a patient."""
+    return render_template("timeline.html", patient_id=patient_id)
 
 
 # ============================================
