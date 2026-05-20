@@ -27,8 +27,9 @@
   .font-mono { font-family: 'DM Mono', monospace; }
   .surface { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-1); }
   .surface-raised { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-2); }
-  .lift { transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .lift:hover { box-shadow: var(--shadow-3); transform: translateY(-2px); }
+  /* Clean outlined device card — hairline border, no resting shadow */
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; transition: border-color 0.18s, transform 0.18s; }
+  .card:hover { border-color: var(--ink-4); transform: translateY(-1px); }
   .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
   .btn-open {
     display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 12px;
@@ -162,7 +163,7 @@
       const cat = CATEGORY[d.category] || CATEGORY.general;
       const recalled = d.recall_flag;
       const critical = recalled && d.recall && d.recall.indicator === 'critical';
-      const ring = recalled ? `box-shadow: 0 0 0 2px ${critical ? 'var(--coral)' : 'var(--honey)'}33, var(--shadow-1);` : '';
+      const border = recalled ? `border-color:${critical ? 'var(--coral)' : 'var(--honey)'};` : '';
       const recallBadge = recalled
         ? chip(`RECALL · ${(d.recall && d.recall.classification) || ''}`,
                critical ? 'var(--coral)' : 'var(--honey)', '#fff') : '';
@@ -176,7 +177,7 @@
         return chip(s.display.replace('MRI: ', ''), st.bg, st.fg);
       }).join(' ');
       return `
-      <div class="surface lift overflow-hidden flex flex-col" style="${ring}">
+      <div class="card overflow-hidden flex flex-col" style="${border}">
         <div style="height:5px;background:${cat.bar};"></div>
         <div class="p-4 flex flex-col h-full">
           <div class="flex items-start justify-between gap-2">
