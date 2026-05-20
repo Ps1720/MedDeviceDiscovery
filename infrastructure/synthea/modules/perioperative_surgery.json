@@ -1,0 +1,60 @@
+{
+  "name": "Perioperative Surgery",
+  "remarks": [
+    "Guarantees every adult patient has at least one inpatient surgical encounter",
+    "with an associated surgical procedure, providing realistic perioperative",
+    "context for PeriopUDI device documentation. Synthetic data only."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Adult_Guard"
+    },
+    "Adult_Guard": {
+      "type": "Guard",
+      "allow": {
+        "condition_type": "Age",
+        "operator": ">=",
+        "quantity": 18,
+        "unit": "years"
+      },
+      "direct_transition": "Surgical_Encounter"
+    },
+    "Surgical_Encounter": {
+      "type": "Encounter",
+      "encounter_class": "inpatient",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "32485007",
+          "display": "Hospital admission (procedure)"
+        }
+      ],
+      "direct_transition": "Surgical_Procedure"
+    },
+    "Surgical_Procedure": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "387713003",
+          "display": "Surgical procedure (procedure)"
+        }
+      ],
+      "duration": {
+        "low": 1,
+        "high": 4,
+        "unit": "hours"
+      },
+      "direct_transition": "End_Surgical_Encounter"
+    },
+    "End_Surgical_Encounter": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    }
+  },
+  "gmf_version": 2
+}

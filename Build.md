@@ -172,26 +172,28 @@ periop-udi/
 **Goal**: HAPI FHIR R4 running locally with US Core v8.0.1 loaded, validation enabled, seeded with synthetic patients.
 
 **Tasks**:
-- [ ] Write `docker-compose.yml` bringing up:
+- [x] Write `docker-compose.yml` bringing up:
   - HAPI FHIR R4 server (hapiproject/hapi:latest) on port 8080
   - Postgres for HAPI persistence
-  - A Synthea seeder container (one-shot)
-- [ ] Configure `infrastructure/hapi/application.yaml`:
+  - A Synthea seeder container (one-shot, `--profile seed`)
+- [x] Configure `infrastructure/hapi/application.yaml`:
   - FHIR version: R4
   - US Core v8.0.1 IG package loaded at startup
   - Validation enabled for write operations
   - CORS open for local development
-- [ ] Write `infrastructure/synthea/seed.sh`:
-  - Generates 50 synthetic patients
-  - Includes a custom `perioperative_surgery.json` module adding surgical encounters
-  - Loads bundles via HAPI's `$transaction` endpoint
-- [ ] Add `make seed` target to root Makefile
-- [ ] Verify: `curl http://localhost:8080/fhir/Patient?_count=5` returns 5 patients
+  - (plus: HAPI Tester web UI enabled at http://localhost:8080/)
+- [x] Write `infrastructure/synthea/seed.sh`:
+  - Generates 50 synthetic patients (with `modules/perioperative_surgery.json`)
+  - Loads bundles via HAPI's `$transaction` endpoint (orgs/practitioners first)
+- [x] Add `make seed` target to root Makefile (also `make hapi`)
+- [x] Verify: `curl http://localhost:8080/fhir/Patient?_count=5` returns patients
 
-**Acceptance**:
-- `docker-compose up` brings everything online
-- `make seed` populates 50 patients
-- HAPI rejects a deliberately invalid Device resource (validation working)
+**Acceptance**: ✅ all met (2026-05-19)
+- `docker-compose up` brings everything online (HAPI R4 4.0.1, HAPI FHIR 8.8.0)
+- `make seed` populated **65 Patients** (50 alive + 15 deceased) + 4,550 Encounters,
+  11,628 Procedures, 38,260 Observations — all HTTP 200 under active validation
+- HAPI rejects a deliberately invalid Device resource → **HTTP 422** OperationOutcome
+- Note: `gudid-core` moved to host port **5000** (HAPI owns 8080)
 
 **Hand to Claude Code prompt**:
 > *"Implement Phase 1 per BUILD.md. Set up docker-compose with HAPI FHIR R4 + Postgres, configure HAPI to load the US Core v8.0.1 Implementation Guide with validation enabled, and write a Synthea seed script that creates 50 patients with surgical histories."*
@@ -550,4 +552,4 @@ If any of these is missing 2 weeks before the deadline, **cut Bulk Data and Subs
 
 ---
 
-*Last updated: 2026-05-19 — Phase 0 complete (scaffolding + app relocation, verified via Docker build & /health).*
+*Last updated: 2026-05-19 — Phase 1 complete (HAPI R4 + US Core v8.0.1 + validation, seeded 65 Synthea patients; browse UI at http://localhost:8080/). Phase 0 also complete.*

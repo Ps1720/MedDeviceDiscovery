@@ -1,0 +1,56 @@
+spring:
+  main:
+    allow-circular-references: true
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+    fail-on-missing-locations: false
+  datasource:
+    url: jdbc:postgresql://hapi-db:5432/hapi
+    username: hapi
+    password: hapi
+    driver-class-name: org.postgresql.Driver
+    max-active: 15
+  jpa:
+    properties:
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+      hibernate.search.enabled: false
+
+hapi:
+  fhir:
+    # ---- Core ----
+    fhir_version: R4
+    server_address: http://localhost:8080/fhir
+    default_encoding: json
+
+    # ---- US Core v8.0.1 Implementation Guide ----
+    # Installed at startup so Device resources can be validated against the
+    # US Core Implantable Device Profile (Build.md Phase 1 / Phase 7).
+    implementationguides:
+      us_core:
+        name: hl7.fhir.us.core
+        version: 8.0.1
+
+    # ---- Validation (Build.md acceptance: HAPI rejects an invalid Device) ----
+    validation:
+      requests_enabled: true
+      responses_enabled: false
+
+    # ---- CORS open for local development ----
+    cors:
+      allow_Credentials: true
+      allowed_origin:
+        - "*"
+
+    # ---- Capabilities kept lean for the demo ----
+    allow_multiple_delete: true
+    allow_external_references: true
+    reuse_cached_search_results_millis: 60000
+
+    # ---- Browsable web UI (HAPI Tester overlay) at http://localhost:8080/ ----
+    tester:
+      home:
+        name: PeriopUDI HAPI FHIR Server
+        server_address: http://localhost:8080/fhir
+        refuse_to_fetch_third_party_urls: false
+        fhir_version: R4

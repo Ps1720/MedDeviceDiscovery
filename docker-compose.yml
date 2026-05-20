@@ -1,17 +1,67 @@
 services:
+  # ---- FHIR foundation (Phase 1) ----
+  hapi-db:
+    image: postgres:16
+    container_name: periop-udi-hapi-db
+    environment:
+      - POSTGRES_DB=hapi
+      - POSTGRES_USER=hapi
+      - POSTGRES_PASSWORD=hapi
+    volumes:
+      - hapi-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hapi -d hapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  hapi:
+    image: hapiproject/hapi:latest
+    container_name: periop-udi-hapi
+    depends_on:
+      hapi-db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_CONFIG_LOCATION=file:///app/config/application.yaml
+    volumes:
+      - ./infrastructure/hapi/application.yaml:/app/config/application.yaml:ro
+    # NOTE: the hapiproject/hapi image is distroless (no shell), so an in-container
+    # healthcheck can't run. The seeder waits for HAPI's metadata endpoint itself.
+    restart: unless-stopped
+
+  # ---- Synthea seeder (Phase 1, one-shot) ----
+  synthea-seed:
+    build: ./infrastructure/synthea
+    container_name: periop-udi-synthea-seed
+    depends_on:
+      hapi:
+        condition: service_started
+    environment:
+      - FHIR_BASE_URL=http://hapi:8080/fhir
+      - PATIENT_COUNT=${PATIENT_COUNT:-50}
+    volumes:
+      - ./infrastructure/synthea:/synthea-work
+    profiles:
+      - seed
+
+  # ---- GUDID core app (existing STA app; moved off 8080) ----
   gudid-core:
     build: ./services/gudid-core
     container_name: periop-udi-gudid-core
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "5000:5000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - HOST_IP=${HOST_IP}
-      - PORT=${PORT:-8080}
+      - PORT=5000
       - FLASK_ENV=${FLASK_ENV:-production}
+      - FHIR_BASE_URL=http://hapi:8080/fhir
     volumes:
       - ./services/gudid-core/static/qr_codes:/app/static/qr_codes
       - ./services/gudid-core/data:/app/data
@@ -21,17 +71,21 @@ services:
     build: ./services/gudid-core
     container_name: periop-udi-gudid-core-dev
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "5000:5000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - HOST_IP=${HOST_IP}
-      - PORT=${PORT:-8080}
+      - PORT=5000
       - FLASK_ENV=development
+      - FHIR_BASE_URL=http://hapi:8080/fhir
     volumes:
       - ./services/gudid-core:/app
     command: python app.py
     profiles:
       - dev
+
+volumes:
+  hapi-pgdata:
