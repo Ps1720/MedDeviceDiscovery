@@ -26,32 +26,46 @@
             <div id="search-results" class="mt-3"></div>
         </div>
 
-        <!-- Two primary workflows -->
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-8">
-            <!-- Patient (primary) -->
-            <a href="/patients" class="lg:col-span-3 group bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
-                <div class="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
-                        <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="text-xl font-bold">Patient Device Chart</h2>
-                    <p class="text-white/80 mt-1 text-sm">Open a patient to view their documented devices, US Core records, MRI-safety flags, and live FDA recall alerts — then scan to add more.</p>
-                    <span class="inline-block mt-3 text-sm font-medium bg-white/20 px-3 py-1 rounded-lg group-hover:bg-white/30">Choose a patient →</span>
-                </div>
-            </a>
+        <!-- Patient (primary, full width) -->
+        <a href="/patients" class="group block bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl shadow-sm p-6 mb-4 flex items-start gap-4 hover:shadow-md transition">
+            <div class="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold">Patient Device Chart</h2>
+                <p class="text-white/80 mt-1 text-sm">Open a patient to view their documented devices, US Core records, MRI-safety flags, and live FDA recall alerts — then scan to add more.</p>
+                <span class="inline-block mt-3 text-sm font-medium bg-white/20 px-3 py-1 rounded-lg group-hover:bg-white/30">Choose a patient →</span>
+            </div>
+        </a>
 
-            <!-- Device (secondary) -->
-            <a href="/scan-to-chart" class="lg:col-span-2 group bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
-                <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+        <!-- Two device workflows, in parallel -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <!-- Identify a device (standalone — no patient) -->
+            <a href="/scan" class="group bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
+                <div class="w-14 h-14 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
                         <path d="M3 5h2v14H3V5Zm3 0h1v14H6V5Zm2 0h2v14H8V5Zm3 0h1v14h-1V5Zm3 0h2v14h-2V5Zm3 0h1v14h-1V5Zm2 0h2v14h-2V5Z"/>
                     </svg>
                 </div>
                 <div>
+                    <h2 class="text-lg font-bold text-slate-800">Identify a Device</h2>
+                    <p class="text-slate-500 mt-1 text-sm">Scan or enter any UDI to look it up in FDA GUDID — manufacturer, type, MRI safety, sterility. No patient needed.</p>
+                    <span class="inline-block mt-3 text-sm font-medium text-sky-700 bg-sky-50 px-3 py-1 rounded-lg">Scan / look up →</span>
+                </div>
+            </a>
+
+            <!-- Document a device (to a patient chart) -->
+            <a href="/scan-to-chart" class="group bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
+                <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                        <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/>
+                    </svg>
+                </div>
+                <div>
                     <h2 class="text-lg font-bold text-slate-800">Document a Device</h2>
-                    <p class="text-slate-500 mt-1 text-sm">Scan or enter a UDI, look it up in FDA GUDID, and write a US Core Device to a patient's chart.</p>
+                    <p class="text-slate-500 mt-1 text-sm">Scan a UDI and write it to a patient's chart as a US Core FHIR Device, with recall checking.</p>
                     <span class="inline-block mt-3 text-sm font-medium text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg">Scan to chart →</span>
                 </div>
             </a>
