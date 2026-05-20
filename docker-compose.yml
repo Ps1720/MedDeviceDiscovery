@@ -1,7 +1,7 @@
 services:
-  web:
-    build: .
-    container_name: med-device-discovery
+  gudid-core:
+    build: ./services/gudid-core
+    container_name: periop-udi-gudid-core
     ports:
       - "${PORT:-8080}:${PORT:-8080}"
     environment:
@@ -9,17 +9,17 @@ services:
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - HOST_IP=${HOST_IP:-localhost}
+      - HOST_IP=${HOST_IP}
       - PORT=${PORT:-8080}
       - FLASK_ENV=${FLASK_ENV:-production}
     volumes:
-      - ./static/qr_codes:/app/static/qr_codes
-      - ./data:/app/data
+      - ./services/gudid-core/static/qr_codes:/app/static/qr_codes
+      - ./services/gudid-core/data:/app/data
     restart: unless-stopped
 
-  web-dev:
-    build: .
-    container_name: med-device-discovery-dev
+  gudid-core-dev:
+    build: ./services/gudid-core
+    container_name: periop-udi-gudid-core-dev
     ports:
       - "${PORT:-8080}:${PORT:-8080}"
     environment:
@@ -27,12 +27,11 @@ services:
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
-      - HOST_IP=${HOST_IP:-localhost}
+      - HOST_IP=${HOST_IP}
       - PORT=${PORT:-8080}
       - FLASK_ENV=development
     volumes:
-      - .:/app
-      - ./static/qr_codes:/app/static/qr_codes
+      - ./services/gudid-core:/app
     command: python app.py
     profiles:
       - dev

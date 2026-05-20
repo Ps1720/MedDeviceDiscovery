@@ -1,7 +1,29 @@
-#Ignore environment variable files
+# Environment variable files
 .env
-static/qr_codes/00850044399178.png
-static/qr_codes/bd_alaris_8015.png
-static/qr_codes/draeger_apollo.png
-static/qr_codes/ge_b650.png
-static/qr_codes/philips_mx800.png
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+ENV/
+env/
+
+# Databases / caches
+*.sqlite
+*.db
+.pytest_cache/
+.coverage
+
+# Generated QR codes (regenerable cache)
+services/gudid-core/static/qr_codes/*.png
+
+# OS
+.DS_Store
+
+# Synthea / HAPI generated data
+infrastructure/synthea/output/
+infrastructure/hapi/data/
+
+# Eval data populated during pilot (keep .gitkeep, ignore real logs)
+eval/usage_logs/*.csv

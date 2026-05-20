@@ -39,7 +39,7 @@ class Config:
     
     # Server settings
     HOST = "0.0.0.0"  # Listen on all interfaces
-    PORT = int(os.getenv("PORT", 5000))
+    PORT = int(os.getenv("PORT", 8080))
     DEBUG = os.getenv("FLASK_ENV", "production") == "development"
     
     # Network settings for QR codes

@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "PeriopUDI: SMART-on-FHIR Perioperative Device Documentation with Real-Time FDA Recall Surveillance"
+abstract: >-
+  A SMART-on-FHIR application that closes the perioperative device-documentation
+  gap by turning a 30-second scan into a USCDI-conformant, GUDID-validated,
+  recall-aware implantable device record at the point of care.
+authors:
+  - family-names: Sharma
+    given-names: Prashant
+    affiliation: "University of Alabama at Birmingham"
+    email: psharma2@uab.edu
+keywords:
+  - FHIR
+  - SMART-on-FHIR
+  - US Core
+  - CDS Hooks
+  - GUDID
+  - medical devices
+  - perioperative
+  - device documentation
+license: Apache-2.0
+repository-code: "https://github.com/Ps1720/MedDeviceDiscovery"
+version: 0.1.0
+date-released: 2026-05-19
