@@ -56,12 +56,14 @@ def parse_udi(udi: str) -> Optional[Dict[str, Any]]:
         
         if response.status_code == 200:
             data = response.json()
-            # Extract the DI from the parsed response
-            if data and "udi" in data:
+            # The v3 parse_udi API returns di/issuingAgency at the TOP level
+            # (alongside an echoed "udi" string). Older shapes nested them under
+            # "udi" -> handle both.
+            if data and ("di" in data or "udi" in data):
                 return {
-                    "di": _safe_get(data, "udi", "di"),
-                    "issuing_agency": _safe_get(data, "udi", "issuingAgency"),
-                    "raw": data
+                    "di": data.get("di") or _safe_get(data, "udi", "di"),
+                    "issuing_agency": data.get("issuingAgency") or _safe_get(data, "udi", "issuingAgency"),
+                    "raw": data,
                 }
             return data
         else:

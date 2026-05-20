@@ -45,21 +45,31 @@ def _client() -> HapiClient:
     return HapiClient(FHIR_BASE_URL)
 
 
-def _resolve_di(udi: str) -> tuple[str, Optional[str], Optional[str]]:
+def _resolve_di(udi: str) -> tuple[str, Optional[str], Optional[str], dict]:
     """
-    Return (device_identifier, issuing_agency, udi_hrf) for a scanned string.
+    Return (device_identifier, issuing_agency, udi_hrf, production_ids) for a
+    scanned string.
 
-    A pure-numeric string is treated as a Device Identifier (DI). Anything else
-    is parsed via GUDID to extract the DI and issuing agency.
+    A pure-numeric string is treated as a bare Device Identifier (DI) with no
+    production identifiers. Anything else is parsed via GUDID, which also yields
+    the expiration date, lot, serial, and manufacture date from the UDI's
+    production-identifier segments.
     """
     udi = udi.strip()
     if udi.isdigit():
-        return udi, None, udi
+        return udi, None, udi, {}
     parsed = parse_udi(udi)
     if parsed and parsed.get("di"):
-        return parsed["di"], parsed.get("issuing_agency"), udi
+        raw = parsed.get("raw") or {}
+        pis = {
+            "expiration_date": raw.get("expirationDate"),
+            "lot_number": raw.get("lotNumber"),
+            "serial_number": raw.get("serialNumber"),
+            "manufacture_date": raw.get("manufactureDate") or raw.get("manufacturingDate"),
+        }
+        return parsed["di"], parsed.get("issuing_agency"), udi, pis
     # Fall back to using the raw string as the DI.
-    return udi, None, udi
+    return udi, None, udi, {}
 
 
 def document_device(
@@ -82,7 +92,7 @@ def document_device(
         if not patient_id or not str(patient_id).strip():
             return {"success": False, "error": "No patient selected"}
 
-        di, issuing_agency, udi_hrf = _resolve_di(udi)
+        di, issuing_agency, udi_hrf, production_ids = _resolve_di(udi)
 
         record = get_device_from_gudid(di)
         if not record:
@@ -97,6 +107,10 @@ def document_device(
             patient_id=str(patient_id).strip(),
             udi_hrf=udi_hrf,
             issuing_agency=issuing_agency,
+            serial_number=production_ids.get("serial_number"),
+            lot_number=production_ids.get("lot_number"),
+            expiration_date=production_ids.get("expiration_date"),
+            manufacture_date=production_ids.get("manufacture_date"),
         )
 
         client = _client()
