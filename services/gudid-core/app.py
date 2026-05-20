@@ -28,6 +28,7 @@ from scan_to_chart import (
     document_device,
     list_patients,
     get_patient_chart,
+    get_recent_devices,
 )
 
 app = Flask(__name__)
@@ -65,7 +66,29 @@ DEVICES = load_devices()
 
 @app.route("/")
 def index():
-    """Home page - shows QR generator and recent/categorized devices."""
+    """Patient-first landing page (PeriopUDI)."""
+    return render_template("home.html", base_url=Config.BASE_URL)
+
+
+@app.route("/patients")
+def patients_page():
+    """Patient picker — choose a patient to open their device chart."""
+    return render_template("patients.html")
+
+
+@app.route("/api/recent-devices")
+def api_recent_devices():
+    """Recently documented devices across all patients (for the home feed)."""
+    limit = min(request.args.get("limit", 8, type=int), 24)
+    try:
+        return jsonify({"devices": get_recent_devices(limit=limit)})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"devices": [], "error": str(exc)}), 200
+
+
+@app.route("/tools")
+def tools_page():
+    """Device-discovery tools (QR generator, recent/categorized devices)."""
     conn = create_connection()
     try:
         # Get recent QR codes

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeriopUDI — Choose a Patient</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <div class="max-w-3xl mx-auto px-6 py-8">
+        <header class="mb-5 flex items-center justify-between">
+            <div>
+                <a href="/" class="text-sm text-slate-400 hover:text-slate-600">← Home</a>
+                <h1 class="text-2xl font-bold text-slate-800 mt-1">Choose a patient</h1>
+                <p class="text-slate-500 text-sm">Open a patient to view and document their devices.</p>
+            </div>
+        </header>
+
+        <input id="filter" type="text" placeholder="Filter by name or ID…"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+
+        <div id="list" class="space-y-2">
+            <p class="text-slate-400">Loading patients…</p>
+        </div>
+    </div>
+
+    <script>
+        let allPatients = [];
+        const listEl = document.getElementById('list');
+        const filterEl = document.getElementById('filter');
+
+        function initials(name) {
+            const parts = (name || '').replace(/[0-9]/g, '').trim().split(/\s+/).filter(Boolean);
+            return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
+        }
+
+        function render(patients) {
+            if (!patients.length) { listEl.innerHTML = '<p class="text-slate-400">No matching patients.</p>'; return; }
+            listEl.innerHTML = patients.map(p => `
+                <a href="/patient/${p.id}/timeline" class="flex items-center gap-3 bg-white rounded-xl border border-slate-200 p-3 hover:shadow-md transition">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-sm font-bold shrink-0">${initials(p.name)}</div>
+                    <div class="flex-1">
+                        <div class="font-medium text-slate-800">${p.name}</div>
+                        <div class="text-xs text-slate-400">Patient ID ${p.id}</div>
+                    </div>
+                    <span class="text-slate-300">→</span>
+                </a>`).join('');
+        }
+
+        filterEl.addEventListener('input', () => {
+            const q = filterEl.value.trim().toLowerCase();
+            render(allPatients.filter(p => p.name.toLowerCase().includes(q) || String(p.id).includes(q)));
+        });
+
+        async function load() {
+            try {
+                const res = await fetch('/api/patients?limit=200');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                allPatients = data.patients || [];
+                render(allPatients);
+            } catch (e) {
+                listEl.innerHTML = `<p class="text-red-500">Could not load patients: ${e.message}</p>`;
+            }
+        }
+        load();
+    </script>
+</body>
+</html>

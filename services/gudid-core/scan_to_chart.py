@@ -284,6 +284,31 @@ def get_patient_timeline(patient_id: str) -> list[dict]:
     return get_patient_chart(patient_id)["devices"]
 
 
+def get_recent_devices(limit: int = 8) -> list[dict]:
+    """Recently documented US Core devices across all patients, newest first."""
+    resp = requests.get(
+        f"{FHIR_BASE_URL}/Device",
+        params={"_count": 40, "_sort": "-_lastUpdated"},
+        headers={"Accept": "application/fhir+json"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    bundle = resp.json()
+    out = []
+    for entry in bundle.get("entry", []):
+        device = entry.get("resource", {})
+        profiles = (device.get("meta") or {}).get("profile") or []
+        if US_CORE_IMPLANTABLE_DEVICE not in profiles:
+            continue  # surface the devices documented through PeriopUDI
+        entry_data = _simplify_device(device)
+        ref = (device.get("patient") or {}).get("reference") or ""
+        entry_data["patient_id"] = ref.split("/")[-1] if ref else None
+        out.append(entry_data)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def get_patient_recall_cards(patient_id: str) -> list[dict]:
     """Query the CDS Hooks recall-check service for this patient's recall cards."""
     if not CDS_HOOKS_URL:
