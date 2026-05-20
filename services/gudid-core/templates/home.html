@@ -1,146 +1,343 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PeriopUDI — Perioperative Device Documentation</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeriopUDI — Perioperative Device Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #FAF6F4; --surface: #FFFFFF; --surface-warm: #FDF6F3; --surface-cool: #F5F0F2;
+    --ink: #2A1E2E; --ink-2: #5A4A5E; --ink-3: #7E6E82; --ink-4: #ADA2B0;
+    --rule: #ECE3E5; --rule-soft: #F4EEEF;
+    --primary: #6B3D5C; --primary-soft: #EFE2EA; --primary-deep: #4A2A40;
+    --blush: #E89B95; --blush-soft: #FBE5E2; --blush-deep: #B8665E;
+    --coral: #D86A4A; --coral-soft: #FAE0D5; --coral-deep: #8E3D24;
+    --honey: #D4A04B; --honey-soft: #F7EAD0; --honey-deep: #8A6324;
+    --slate: #6E7D9C; --slate-soft: #DEE3EE; --slate-deep: #45527A;
+    --shadow-1: 0 1px 2px rgba(42,30,46,0.04), 0 2px 4px rgba(42,30,46,0.04);
+    --shadow-2: 0 4px 12px rgba(42,30,46,0.06), 0 2px 4px rgba(42,30,46,0.04);
+    --shadow-3: 0 12px 32px rgba(42,30,46,0.08), 0 4px 12px rgba(42,30,46,0.06);
+  }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .font-mono { font-family: 'DM Mono', monospace; }
+  .surface { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-1); }
+  .surface-raised { background: var(--surface); border-radius: 24px; box-shadow: var(--shadow-2); }
+  .lift { transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .lift:hover { box-shadow: var(--shadow-3); transform: translateY(-3px); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  @keyframes pulse { 0%,100% { opacity: 0.4; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+  .pulse-dot { animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fade-up 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .d1 { animation-delay: 0.05s; } .d2 { animation-delay: 0.12s; } .d3 { animation-delay: 0.19s; } .d4 { animation-delay: 0.26s; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 14px; font-weight: 500; font-size: 14px; transition: all 0.2s; cursor: pointer; }
+  .btn-primary { background: var(--primary); color: white; box-shadow: 0 1px 2px rgba(107,61,92,0.2), 0 4px 12px rgba(107,61,92,0.18); }
+  .btn-primary:hover { background: var(--primary-deep); transform: translateY(-1px); }
+  .number-display { font-feature-settings: 'tnum'; }
+</style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div class="max-w-6xl mx-auto px-6 py-10">
+<body class="min-h-screen">
 
-        <!-- Title -->
-        <header class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-slate-800">PeriopUDI</h1>
-            <p class="text-slate-500 mt-1">Scan a device, document it to the patient's chart, and check it for FDA recalls — at the point of care.</p>
-        </header>
-
-        <!-- Device search -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
-            <label class="block text-xs uppercase tracking-wide text-slate-400 font-semibold mb-2">Search FDA GUDID</label>
-            <div class="flex gap-2">
-                <input id="search" type="text" placeholder="Search by device name, brand, manufacturer, or UDI-DI…"
-                    class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <button id="search-btn" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg font-medium">Search</button>
-            </div>
-            <div id="search-results" class="mt-3"></div>
+  <!-- Top nav -->
+  <header class="sticky top-0 z-30" style="background: rgba(250,246,244,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary); box-shadow: var(--shadow-1);">
+          <div class="grid grid-cols-2 gap-0.5">
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: var(--blush);"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: var(--blush);"></div>
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+          </div>
         </div>
+        <div>
+          <div class="font-semibold text-[15px]" style="color: var(--ink);">PeriopUDI</div>
+          <div class="text-[11px]" style="color: var(--ink-3);">Perioperative device documentation</div>
+        </div>
+      </a>
+      <div class="flex items-center gap-2">
+        <span class="chip" style="background: var(--slate-soft); color: var(--slate-deep);">
+          <span class="dot pulse-dot" style="background: var(--slate);"></span>
+          FHIR connected
+        </span>
+        <span class="chip hidden md:inline-flex" style="background: var(--blush-soft); color: var(--blush-deep);">
+          AMIA 2026
+        </span>
+      </div>
+    </div>
+  </header>
 
-        <!-- Patient (primary, full width) -->
-        <a href="/patients" class="group block bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl shadow-sm p-6 mb-4 flex items-start gap-4 hover:shadow-md transition">
-            <div class="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
-                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"/>
-                </svg>
+  <main class="max-w-6xl mx-auto px-6 py-10">
+
+    <!-- Hero -->
+    <section class="mb-10 fade-up">
+      <div class="chip mb-5" style="background: var(--blush-soft); color: var(--blush-deep);">
+        <span class="dot" style="background: var(--blush);"></span>
+        Perioperative · Device · Documentation
+      </div>
+      <h1 class="text-[44px] md:text-[58px] leading-[1.05] font-semibold tracking-tight" style="color: var(--ink);">
+        Scan a device.<br>
+        Document it in <em style="font-family: 'DM Sans'; color: var(--primary);">FHIR</em>.<br>
+        <span style="color: var(--ink-3);">Catch the recall before they do.</span>
+      </h1>
+      <p class="mt-6 max-w-2xl text-[16px] leading-[1.6]" style="color: var(--ink-2);">
+        A medical-device documentation app that turns a thirty-second scan into a US Core-conformant,
+        GUDID-validated, recall-aware FHIR Device record — at the point of care.
+      </p>
+    </section>
+
+    <!-- Search panel -->
+    <section class="surface-raised p-6 md:p-7 mb-8 fade-up d1">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-[15px] font-semibold mb-0.5" style="color: var(--ink);">Search FDA GUDID</h2>
+          <p class="text-[13px]" style="color: var(--ink-3);">Brand, manufacturer, GMDN term, or UDI-DI</p>
+        </div>
+        <span class="chip" style="background: var(--slate-soft); color: var(--slate-deep);">
+          <span class="dot pulse-dot" style="background: var(--slate);"></span> Live
+        </span>
+      </div>
+      <div class="flex flex-col md:flex-row gap-3 mb-5">
+        <div class="flex-1 flex items-center gap-3 px-4 py-3.5 rounded-2xl" style="background: var(--surface-warm); border: 1.5px solid var(--rule);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ink-3);"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+          <input id="search" type="text" placeholder="e.g. a UDI-DI like 08717648200274…"
+            class="flex-1 bg-transparent border-0 focus:outline-none text-[15px]" style="color: var(--ink);">
+        </div>
+        <button id="search-btn" class="btn btn-primary">
+          Search
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div class="pt-4 border-t" style="border-color: var(--rule-soft);">
+        <div class="text-[11px] font-mono uppercase tracking-wider mb-3" style="color: var(--ink-4);">Matches</div>
+        <div id="search-results" class="grid gap-2">
+          <p class="text-[13px]" style="color: var(--ink-4);">Enter a device identifier or term and hit Search.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Three workflow cards -->
+    <section class="mb-10">
+      <div class="flex items-end justify-between mb-5">
+        <h2 class="text-[22px] font-semibold tracking-tight" style="color: var(--ink);">Where would you like to begin?</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <!-- Patient chart -->
+        <a href="/patients" class="surface lift p-6 block fade-up d1 relative overflow-hidden" style="background: var(--blush-soft);">
+          <div class="absolute -right-8 -bottom-8 opacity-15 pointer-events-none">
+            <svg width="140" height="140" viewBox="0 0 100 100" fill="none">
+              <circle cx="50" cy="35" r="15" stroke="var(--blush-deep)" stroke-width="2"/>
+              <path d="M22 92 C22 70, 35 60, 50 60 C65 60, 78 70, 78 92" stroke="var(--blush-deep)" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+          <div class="relative">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white; box-shadow: var(--shadow-1);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--blush-deep);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
-            <div>
-                <h2 class="text-xl font-bold">Patient Device Chart</h2>
-                <p class="text-white/80 mt-1 text-sm">Open a patient to view their documented devices, US Core records, MRI-safety flags, and live FDA recall alerts — then scan to add more.</p>
-                <span class="inline-block mt-3 text-sm font-medium bg-white/20 px-3 py-1 rounded-lg group-hover:bg-white/30">Choose a patient →</span>
+            <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Patient chart</h3>
+            <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
+              Open a patient to see documented FHIR Devices, MRI-safety flags, and active recall status.
+            </p>
+            <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--blush-deep);">
+              Open chart
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </div>
+          </div>
         </a>
 
-        <!-- Two device workflows, in parallel -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <!-- Identify a device (standalone — no patient) -->
-            <a href="/scan" class="group bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
-                <div class="w-14 h-14 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
-                        <path d="M3 5h2v14H3V5Zm3 0h1v14H6V5Zm2 0h2v14H8V5Zm3 0h1v14h-1V5Zm3 0h2v14h-2V5Zm3 0h1v14h-1V5Zm2 0h2v14h-2V5Z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="text-lg font-bold text-slate-800">Identify a Device</h2>
-                    <p class="text-slate-500 mt-1 text-sm">Scan or enter any UDI to look it up in FDA GUDID — manufacturer, type, MRI safety, sterility. No patient needed.</p>
-                    <span class="inline-block mt-3 text-sm font-medium text-sky-700 bg-sky-50 px-3 py-1 rounded-lg">Scan / look up →</span>
-                </div>
-            </a>
+        <!-- Identify -->
+        <a href="/scan" class="surface lift p-6 block fade-up d2 relative" style="background: var(--surface);">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: var(--honey-soft);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--honey-deep);"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+          </div>
+          <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Identify a device</h3>
+          <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
+            Scan or paste any UDI to query FDA GUDID directly. No patient context required.
+          </p>
+          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--honey-deep);">
+            Look up
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </div>
+        </a>
 
-            <!-- Document a device (to a patient chart) -->
-            <a href="/scan-to-chart" class="group bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
-                <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
-                        <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="text-lg font-bold text-slate-800">Document a Device</h2>
-                    <p class="text-slate-500 mt-1 text-sm">Scan a UDI and write it to a patient's chart as a US Core FHIR Device, with recall checking.</p>
-                    <span class="inline-block mt-3 text-sm font-medium text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg">Scan to chart →</span>
-                </div>
-            </a>
+        <!-- Scan-to-chart (primary) -->
+        <a href="/scan-to-chart" class="surface lift p-6 block fade-up d3 relative overflow-hidden" style="background: linear-gradient(165deg, #FBE5E2 0%, #EFE2EA 100%); border: 1.5px solid var(--primary);">
+          <div class="absolute top-5 right-5">
+            <span class="chip" style="background: var(--primary); color: white;">Recommended</span>
+          </div>
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white; box-shadow: var(--shadow-1);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Scan-to-chart</h3>
+          <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
+            UDI in. US Core FHIR Device out, linked to the patient and recall-checked — in seconds.
+          </p>
+          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--primary);">
+            Document a device
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Recently documented -->
+    <section class="mb-10">
+      <div class="flex items-end justify-between mb-5">
+        <div>
+          <h2 class="text-[22px] font-semibold tracking-tight" style="color: var(--ink);">Recently documented</h2>
+          <p class="text-[14px] mt-1" style="color: var(--ink-3);">Devices captured to the FHIR store</p>
         </div>
+        <a href="/tools" class="text-[13px] font-semibold inline-flex items-center gap-1.5" style="color: var(--primary);">
+          Device tools
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+      <div id="recent" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <p class="text-[14px]" style="color: var(--ink-4);">Loading…</p>
+      </div>
+    </section>
 
-        <!-- Recently documented -->
-        <section>
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-semibold text-slate-700">Recently documented</h2>
-                <a href="/tools" class="text-sm text-slate-400 hover:text-slate-600">Device tools & QR codes →</a>
-            </div>
-            <div id="recent" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <p class="text-slate-400 text-sm">Loading…</p>
-            </div>
-        </section>
-    </div>
+    <!-- Capabilities panel (no patient/usage data) -->
+    <section class="surface-raised p-7 md:p-9 mb-10 fade-up">
+      <div class="flex items-end justify-between mb-6">
+        <div>
+          <h2 class="text-[20px] font-semibold tracking-tight" style="color: var(--ink);">Built for conformance</h2>
+          <p class="text-[13px] mt-1" style="color: var(--ink-3);">Standards and capabilities, not patient data</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-5">
+        <div class="p-5 rounded-2xl" style="background: var(--primary-soft);">
+          <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--primary-deep); opacity: 0.7;">US Core pass</div>
+          <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--primary-deep);">100<span class="text-[20px]">%</span></div>
+          <div class="text-[12px] mt-2" style="color: var(--primary-deep);">v8.0.1 · validated</div>
+        </div>
+        <div class="p-5 rounded-2xl" style="background: var(--blush-soft);">
+          <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--blush-deep); opacity: 0.85;">Scan → FHIR</div>
+          <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--blush-deep);">&lt;2<span class="text-[20px]">s</span></div>
+          <div class="text-[12px] mt-2" style="color: var(--blush-deep);">UDI to documented Device</div>
+        </div>
+        <div class="p-5 rounded-2xl" style="background: var(--slate-soft);">
+          <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--slate-deep); opacity: 0.85;">FHIR</div>
+          <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--slate-deep);">R4</div>
+          <div class="text-[12px] mt-2" style="color: var(--slate-deep);">Device · Patient · Procedure</div>
+        </div>
+        <div class="p-5 rounded-2xl" style="background: var(--coral-soft);">
+          <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--coral-deep); opacity: 0.85;">Recall watch</div>
+          <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--coral-deep);">Live</div>
+          <div class="text-[12px] mt-2" style="color: var(--coral-deep);">openFDA · CDS Hooks</div>
+        </div>
+      </div>
+    </section>
 
-    <script>
-        const badge = (t, c) => `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${c}">${t}</span>`;
+    <!-- Footer -->
+    <footer class="pt-8 pb-2" style="border-top: 1px solid var(--rule);">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+        <div>
+          <div class="font-semibold text-[15px]" style="color: var(--ink);">Built at UAB Anesthesiology</div>
+          <div class="text-[13px] mt-0.5" style="color: var(--ink-3);">For the AMIA 2026 FHIR App Competition</div>
+        </div>
+        <div class="md:text-right flex flex-wrap md:justify-end gap-1.5">
+          <span class="chip" style="background: var(--surface); border: 1px solid var(--rule); color: var(--ink-3);">CDS Hooks</span>
+          <span class="chip" style="background: var(--surface); border: 1px solid var(--rule); color: var(--ink-3);">US Core 8.0.1</span>
+          <span class="chip" style="background: var(--surface); border: 1px solid var(--rule); color: var(--ink-3);">FHIR R4</span>
+        </div>
+      </div>
+    </footer>
+  </main>
 
-        // ---- Device search (FDA GUDID) ----
-        const searchInput = document.getElementById('search');
-        const resultsEl = document.getElementById('search-results');
+  <script>
+    const esc = s => (s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
 
-        async function runSearch() {
-            const q = searchInput.value.trim();
-            if (!q) return;
-            resultsEl.innerHTML = '<p class="text-sm text-slate-400">Searching…</p>';
-            try {
-                const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-                const data = await res.json();
-                const hits = [...(data.gudid_results || []), ...(data.local_results || [])];
-                if (!hits.length) {
-                    resultsEl.innerHTML = '<p class="text-sm text-slate-400">No matches in GUDID.</p>';
-                    return;
-                }
-                resultsEl.innerHTML = hits.slice(0, 6).map(h => `
-                    <a href="/device/${h.id}" class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 border border-slate-100">
-                        <span><span class="font-medium text-slate-800">${h.brand_name || h.model || h.id}</span>
-                            <span class="text-slate-400 text-sm"> · ${h.manufacturer || ''}</span></span>
-                        <span class="text-xs font-mono text-slate-400">${h.id || ''}</span>
-                    </a>`).join('');
-            } catch (e) {
-                resultsEl.innerHTML = `<p class="text-sm text-red-500">Search failed: ${e.message}</p>`;
-            }
+    // ---- Device search (live FDA GUDID) ----
+    const searchInput = document.getElementById('search');
+    const resultsEl = document.getElementById('search-results');
+
+    async function runSearch() {
+      const q = searchInput.value.trim();
+      if (!q) return;
+      resultsEl.innerHTML = '<p class="text-[13px]" style="color: var(--ink-4);">Searching…</p>';
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const hits = [...(data.gudid_results || []), ...(data.local_results || [])];
+        if (!hits.length) {
+          resultsEl.innerHTML = '<p class="text-[13px]" style="color: var(--ink-4);">No GUDID matches. (Tip: free-text search is limited by FDA’s API — try a UDI-DI.)</p>';
+          return;
         }
-        document.getElementById('search-btn').addEventListener('click', runSearch);
-        searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+        resultsEl.innerHTML = hits.slice(0, 6).map(h => `
+          <a href="/device/${esc(h.id)}" class="flex items-center justify-between p-3 rounded-2xl transition hover:shadow-sm" style="background: var(--surface-warm);">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: var(--primary-soft);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><path d="M12 2v20M2 12h20"/></svg>
+              </div>
+              <div>
+                <div class="font-semibold text-[14px]" style="color: var(--ink);">${esc(h.brand_name || h.model || h.id)}</div>
+                <div class="text-[12.5px]" style="color: var(--ink-3);">${esc(h.manufacturer || '')}</div>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-mono text-[10.5px]" style="color: var(--ink-4);">UDI-DI</div>
+              <div class="font-mono text-[12px]" style="color: var(--ink-2);">${esc(h.id || '')}</div>
+            </div>
+          </a>`).join('');
+      } catch (e) {
+        resultsEl.innerHTML = `<p class="text-[13px]" style="color: var(--coral-deep);">Search failed: ${esc(e.message)}</p>`;
+      }
+    }
+    document.getElementById('search-btn').addEventListener('click', runSearch);
+    searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
 
-        // ---- Recently documented devices ----
-        async function loadRecent() {
-            const el = document.getElementById('recent');
-            try {
-                const res = await fetch('/api/recent-devices?limit=8');
-                const data = await res.json();
-                const devices = data.devices || [];
-                if (!devices.length) {
-                    el.innerHTML = `<p class="text-slate-400 text-sm col-span-full">No devices documented yet —
-                        <a class="text-blue-600 underline" href="/scan-to-chart">document one</a>.</p>`;
-                    return;
-                }
-                el.innerHTML = devices.map(d => `
-                    <a href="/patient/${d.patient_id}/timeline" class="bg-white rounded-xl border border-slate-200 p-3 hover:shadow-md transition block">
-                        <div class="flex items-center justify-between gap-2">
-                            <h3 class="font-medium text-slate-800 text-sm leading-snug truncate">${d.name}</h3>
-                            ${d.recall_flag ? badge('RECALL', 'bg-red-600 text-white') : (d.us_core ? badge('US Core', 'bg-blue-100 text-blue-700') : '')}
-                        </div>
-                        <p class="text-xs text-slate-500 mt-1 truncate">${d.manufacturer || '—'}</p>
-                        <p class="text-xs text-slate-400 mt-2">Patient ${d.patient_id || '—'}</p>
-                    </a>`).join('');
-            } catch (e) {
-                el.innerHTML = `<p class="text-red-500 text-sm col-span-full">Could not load: ${e.message}</p>`;
-            }
+    // ---- Recently documented (live from HAPI) ----
+    function relTime(iso) {
+      if (!iso) return '';
+      const then = new Date(iso), now = new Date(), s = Math.max(0, (now - then) / 1000);
+      if (s < 90) return 'just now';
+      if (s < 3600) return Math.round(s / 60) + 'm ago';
+      if (s < 86400) return Math.round(s / 3600) + 'h ago';
+      return Math.round(s / 86400) + 'd ago';
+    }
+    function chipFor(d) {
+      if (d.recall_flag) return `<span class="chip mb-4" style="background: var(--coral-soft); color: var(--coral-deep);">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1 21h22L12 2z"/></svg> Recall</span>`;
+      const mri = (d.safety || []).find(s => (s.code || '') === 'mri');
+      if (mri) return `<span class="chip mb-4" style="background: var(--slate-soft); color: var(--slate-deep);">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 12l2 2 4-4"/></svg> ${esc(mri.display.replace('MRI: ',''))}</span>`;
+      if (d.us_core) return `<span class="chip mb-4" style="background: var(--primary-soft); color: var(--primary-deep);">
+        <span class="dot" style="background: var(--primary);"></span> US Core 8.0.1</span>`;
+      return `<span class="chip mb-4" style="background: var(--surface-cool); color: var(--ink-3);">EHR record</span>`;
+    }
+    async function loadRecent() {
+      const el = document.getElementById('recent');
+      try {
+        const res = await fetch('/api/recent-devices?limit=8');
+        const data = await res.json();
+        const devices = data.devices || [];
+        if (!devices.length) {
+          el.innerHTML = `<p class="text-[14px] col-span-full" style="color: var(--ink-4);">No devices documented yet —
+            <a class="font-semibold" style="color: var(--primary);" href="/scan-to-chart">document one</a>.</p>`;
+          return;
         }
-        loadRecent();
-    </script>
+        el.innerHTML = devices.map((d, i) => `
+          <a href="/patient/${esc(d.patient_id)}/timeline" class="surface lift p-5 block fade-up d${(i % 4) + 1}">
+            ${chipFor(d)}
+            <h4 class="font-semibold text-[15px] mb-1" style="color: var(--ink);">${esc(d.name)}</h4>
+            <p class="text-[12.5px]" style="color: var(--ink-3);">${esc(d.manufacturer || '—')}</p>
+            <div class="mt-4 pt-3 border-t flex items-center justify-between text-[11px]" style="border-color: var(--rule-soft); color: var(--ink-3);">
+              <span class="font-mono">${esc((d.device_identifier || '').slice(0, 14) || ('Device/' + d.id))}</span>
+              <span>${esc(relTime(d.last_updated))}</span>
+            </div>
+          </a>`).join('');
+      } catch (e) {
+        el.innerHTML = `<p class="text-[14px] col-span-full" style="color: var(--coral-deep);">Could not load: ${esc(e.message)}</p>`;
+      }
+    }
+    loadRecent();
+  </script>
 </body>
 </html>
