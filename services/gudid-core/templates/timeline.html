@@ -1,179 +1,236 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PeriopUDI — Patient Device Chart</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeriopUDI — Patient Device Chart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #F6F7F9; --surface: #FFFFFF; --surface-warm: #F1F4F7; --surface-cool: #E9EDF2;
+    --ink: #1B2230; --ink-2: #3A4150; --ink-3: #59616F; --ink-4: #8A93A2;
+    --rule: #E2E6EC; --rule-soft: #EDF0F4;
+    --primary: #6B3D5C; --primary-soft: #EFE6EC; --primary-deep: #4A2A40;
+    --coral: #D86A4A; --coral-soft: #FAE0D5; --coral-deep: #8E3D24;
+    --honey: #D4A04B; --honey-soft: #F7EAD0; --honey-deep: #8A6324;
+    --slate: #6E7D9C; --slate-soft: #DEE3EE; --slate-deep: #45527A;
+    --emerald-soft: #E2EFE9; --emerald-deep: #2E6A55;
+    --sky-soft: #DCEEF4; --sky-deep: #245C73;
+    --shadow-1: 0 1px 2px rgba(20,28,45,0.05), 0 2px 4px rgba(20,28,45,0.04);
+    --shadow-2: 0 4px 12px rgba(20,28,45,0.07), 0 2px 4px rgba(20,28,45,0.05);
+    --shadow-3: 0 12px 32px rgba(20,28,45,0.10), 0 4px 12px rgba(20,28,45,0.07);
+  }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .font-mono { font-family: 'DM Mono', monospace; }
+  .surface { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-1); }
+  .surface-raised { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-2); }
+  .lift { transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .lift:hover { box-shadow: var(--shadow-3); transform: translateY(-2px); }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .btn-open {
+    display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 12px;
+    font-size: 13px; font-weight: 600; color: white; background: var(--primary); transition: all 0.15s;
+  }
+  .btn-open:hover { background: var(--primary-deep); transform: translateY(-1px); }
+</style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div class="max-w-7xl mx-auto px-6 py-6">
+<body class="min-h-screen">
 
-        <!-- Patient header bar -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4">
-            <div class="flex items-start justify-between gap-4 flex-wrap">
-                <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-inner shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-9 h-9">
-                            <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-xs uppercase tracking-wide text-slate-400 font-semibold">Perioperative Device Chart</p>
-                        <h1 id="patient-name" class="text-2xl font-bold text-slate-800 mt-1">Loading…</h1>
-                        <div id="patient-meta" class="flex flex-wrap gap-2 mt-2"></div>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <a href="/scan-to-chart" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
-                        + Document device
-                    </a>
-                    <p id="device-count" class="text-xs text-slate-400 mt-2"></p>
-                </div>
-            </div>
+  <!-- App bar -->
+  <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary); box-shadow: var(--shadow-1);">
+          <div class="grid grid-cols-2 gap-0.5">
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+          </div>
         </div>
-
-        <!-- Recall alert banner -->
-        <div id="recall-banner" class="hidden mb-4"></div>
-
-        <!-- Device grid -->
-        <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <p class="text-slate-400">Loading devices…</p>
+        <div>
+          <div class="font-semibold text-[15px]" style="color: var(--ink);">PeriopUDI</div>
+          <div class="text-[11px]" style="color: var(--ink-3);">Patient device chart</div>
         </div>
+      </a>
+      <a href="/patients" class="text-[13px] font-semibold" style="color: var(--ink-3);">← All patients</a>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- Patient header -->
+    <div class="surface-raised p-6 mb-5">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center text-white shrink-0" style="background: linear-gradient(135deg, var(--primary), var(--primary-deep)); box-shadow: var(--shadow-1);">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-9 h-9">
+              <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4);">Perioperative Device Chart</p>
+            <h1 id="patient-name" class="text-[26px] font-semibold tracking-tight mt-0.5" style="color: var(--ink);">Loading…</h1>
+            <div id="patient-meta" class="flex flex-wrap gap-2 mt-2"></div>
+          </div>
+        </div>
+        <div class="text-right">
+          <a href="/scan-to-chart" class="btn-open">+ Document device</a>
+          <p id="device-count" class="text-[12px] mt-2" style="color: var(--ink-4);"></p>
+        </div>
+      </div>
     </div>
 
-    <script>
-        const patientId = {{ patient_id | tojson }};
-        const grid = document.getElementById('grid');
-        const bannerEl = document.getElementById('recall-banner');
+    <!-- Recall banner -->
+    <div id="recall-banner" class="hidden mb-5"></div>
 
-        const badge = (t, c) => `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${c}">${t}</span>`;
-        const chip  = (label, val) => `<span class="text-sm bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
-            <span class="text-slate-400">${label}</span> ${val}</span>`;
+    <!-- Device grid -->
+    <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <p class="text-[14px]" style="color: var(--ink-4);">Loading devices…</p>
+    </div>
+  </main>
 
-        function renderPatient(p) {
-            document.getElementById('patient-name').textContent = p.name || ('Patient ' + p.id);
-            const meta = document.getElementById('patient-meta');
-            const bits = [];
-            bits.push(chip('ID', p.id));
-            if (p.mrn) bits.push(chip('MRN', p.mrn));
-            if (p.gender) bits.push(chip('Sex', p.gender));
-            if (p.age != null) bits.push(chip('Age', p.age));
-            if (p.birth_date) bits.push(chip('DOB', p.birth_date));
-            meta.innerHTML = bits.join('');
+  <script>
+    const esc = s => (s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+    const patientId = {{ patient_id | tojson }};
+    const grid = document.getElementById('grid');
+    const bannerEl = document.getElementById('recall-banner');
+
+    const chip = (t, bg, fg) => `<span class="chip" style="background:${bg};color:${fg};">${esc(t)}</span>`;
+    const metaChip = (label, val) => `<span class="chip" style="background:var(--surface-cool);color:var(--ink-2);">
+        <span style="color:var(--ink-4);font-weight:500;">${label}</span> ${esc(val)}</span>`;
+
+    // Category color coordination (distinct but harmonized with the cool theme)
+    const CATEGORY = {
+      cardiac:    { bar: '#C2536A', bg: '#F7E4E8', fg: '#9B2F47', label: 'Cardiac' },
+      neuro:      { bar: '#7C5BC2', bg: '#ECE6F7', fg: '#553B91', label: 'Neuro' },
+      ortho:      { bar: '#C98A3A', bg: '#F7EAD0', fg: '#8A6324', label: 'Orthopedic' },
+      vascular:   { bar: '#2E8B82', bg: '#DCEFEC', fg: '#1F6157', label: 'Vascular' },
+      ophthalmic: { bar: '#3A8FB0', bg: '#DCEEF4', fg: '#245C73', label: 'Ophthalmic' },
+      general:    { bar: '#6E7D9C', bg: '#DEE3EE', fg: '#45527A', label: 'General' },
+    };
+    const SAFETY = {
+      'mri':        { bg: 'var(--slate-soft)',   fg: 'var(--slate-deep)' },
+      'latex':      { bg: 'var(--coral-soft)',   fg: 'var(--coral-deep)' },
+      'no-latex':   { bg: 'var(--emerald-soft)', fg: 'var(--emerald-deep)' },
+      'single-use': { bg: 'var(--surface-cool)', fg: 'var(--ink-3)' },
+      'sterile':    { bg: 'var(--sky-soft)',     fg: 'var(--sky-deep)' },
+    };
+
+    function renderPatient(p) {
+      document.getElementById('patient-name').textContent = p.name || ('Patient ' + p.id);
+      const meta = document.getElementById('patient-meta');
+      const mrn = p.mrn ? (String(p.mrn).length > 12 ? String(p.mrn).slice(0, 8) + '…' : p.mrn) : null;
+      const bits = [metaChip('ID', p.id)];
+      if (mrn) bits.push(metaChip('MRN', mrn));
+      if (p.gender) bits.push(metaChip('Sex', p.gender));
+      if (p.age != null) bits.push(metaChip('Age', p.age));
+      if (p.birth_date) bits.push(metaChip('DOB', p.birth_date));
+      meta.innerHTML = bits.join('');
+    }
+
+    function renderBanner(recalls) {
+      if (!recalls || !recalls.length) { bannerEl.classList.add('hidden'); return; }
+      const critical = recalls.some(c => c.indicator === 'critical');
+      const bg = critical ? 'var(--coral-soft)' : 'var(--honey-soft)';
+      const fg = critical ? 'var(--coral-deep)' : 'var(--honey-deep)';
+      bannerEl.className = 'mb-5 rounded-2xl p-4';
+      bannerEl.style = `background:${bg};border:1px solid ${fg}33;`;
+      bannerEl.innerHTML = `
+        <div class="flex items-start gap-3">
+          <span class="text-2xl">${critical ? '⛔' : '⚠️'}</span>
+          <div>
+            <h2 class="font-bold" style="color:${fg};">${recalls.length} device recall alert${recalls.length > 1 ? 's' : ''} for this patient</h2>
+            <ul class="text-[13px] mt-1 ml-4 list-disc" style="color:${fg};">
+              ${recalls.map(c => `<li>${esc(c.summary)}</li>`).join('')}
+            </ul>
+          </div>
+        </div>`;
+      bannerEl.classList.remove('hidden');
+    }
+
+    function field(label, val, mono) {
+      return `<div class="flex justify-between gap-2 py-0.5">
+        <dt style="color:var(--ink-4);">${label}</dt>
+        <dd class="text-right ${mono ? 'font-mono text-[12px]' : ''}" style="color:var(--ink-2);">${val ? esc(val) : '—'}</dd></div>`;
+    }
+
+    function deviceCard(d) {
+      const cat = CATEGORY[d.category] || CATEGORY.general;
+      const recalled = d.recall_flag;
+      const critical = recalled && d.recall && d.recall.indicator === 'critical';
+      const ring = recalled ? `box-shadow: 0 0 0 2px ${critical ? 'var(--coral)' : 'var(--honey)'}33, var(--shadow-1);` : '';
+      const recallBadge = recalled
+        ? chip(`RECALL · ${(d.recall && d.recall.classification) || ''}`,
+               critical ? 'var(--coral)' : 'var(--honey)', '#fff') : '';
+      const recallDetail = recalled && d.recall ? `
+        <div class="mt-3 text-[13px] rounded-xl p-2.5" style="background:${critical ? 'var(--coral-soft)' : 'var(--honey-soft)'};color:${critical ? 'var(--coral-deep)' : 'var(--honey-deep)'};">
+          <span class="font-semibold">FDA recall ${esc(d.recall.recall_number || '')}:</span> ${esc(d.recall.reason || '')}
+        </div>` : '';
+      const gmdn = d.type ? `${esc(d.type)}${d.gmdn_code ? ` <span style="color:var(--ink-4)">(GMDN ${esc(d.gmdn_code)})</span>` : ''}` : '—';
+      const safety = (d.safety || []).filter(s => s.display).map(s => {
+        const st = SAFETY[s.code] || { bg: 'var(--surface-cool)', fg: 'var(--ink-3)' };
+        return chip(s.display.replace('MRI: ', ''), st.bg, st.fg);
+      }).join(' ');
+      return `
+      <div class="surface lift overflow-hidden flex flex-col" style="${ring}">
+        <div style="height:5px;background:${cat.bar};"></div>
+        <div class="p-4 flex flex-col h-full">
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="font-semibold text-[15px] leading-snug" style="color:var(--ink);">${esc(d.name)}</h3>
+            ${d.us_core ? chip('US Core', 'var(--primary-soft)', 'var(--primary-deep)') : chip('EHR', 'var(--surface-cool)', 'var(--ink-3)')}
+          </div>
+          <div class="flex flex-wrap gap-1 mt-2">
+            ${chip(cat.label, cat.bg, cat.fg)}
+            ${recallBadge}
+            ${chip(d.status || 'unknown', 'var(--surface-cool)', 'var(--ink-3)')}
+          </div>
+          <p class="text-[13px] mt-3" style="color:var(--ink-3);">${gmdn}</p>
+          <dl class="text-[13px] mt-2">
+            ${field('Manufacturer', d.manufacturer)}
+            ${field('Model', d.model)}
+            ${field('UDI-DI', d.device_identifier, true)}
+            ${field('Expires', (d.expiration_date || '').split('T')[0])}
+          </dl>
+          ${safety ? `<div class="flex flex-wrap gap-1 mt-3">${safety}</div>` : ''}
+          ${recallDetail}
+          <div class="text-[11px] mt-auto pt-3" style="color:var(--ink-4);">
+            <a class="hover:underline" style="color:var(--primary);" href="${esc(d.fhir_url)}" target="_blank">FHIR Device/${esc(d.id)}</a>
+            · ${esc((d.last_updated || '').split('T')[0])}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch(`/patient/${patientId}/devices`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        if (data.patient) renderPatient(data.patient);
+        renderBanner(data.recalls);
+        const devices = data.devices || [];
+        document.getElementById('device-count').textContent =
+          `${devices.length} device${devices.length === 1 ? '' : 's'} on chart`;
+        if (!devices.length) {
+          grid.className = '';
+          grid.innerHTML = `<div class="surface p-8 text-center text-[14px]" style="color:var(--ink-4);">
+            No devices documented yet.
+            <div class="mt-3"><a style="color:var(--primary);font-weight:600;" href="/scan-to-chart">Document one now →</a></div>
+          </div>`;
+          return;
         }
-
-        function renderBanner(recalls) {
-            if (!recalls || !recalls.length) { bannerEl.classList.add('hidden'); return; }
-            const critical = recalls.some(c => c.indicator === 'critical');
-            bannerEl.className = 'mb-4 rounded-2xl p-4 border ' +
-                (critical ? 'bg-red-100 border-red-300' : 'bg-amber-100 border-amber-300');
-            bannerEl.innerHTML = `
-                <div class="flex items-start gap-3">
-                    <span class="text-2xl">${critical ? '⛔' : '⚠️'}</span>
-                    <div>
-                        <h2 class="font-bold ${critical ? 'text-red-800' : 'text-amber-800'}">
-                            ${recalls.length} device recall alert${recalls.length > 1 ? 's' : ''} for this patient</h2>
-                        <ul class="text-sm mt-1 list-disc ml-5 ${critical ? 'text-red-700' : 'text-amber-800'}">
-                            ${recalls.map(c => `<li>${c.summary}</li>`).join('')}
-                        </ul>
-                    </div>
-                </div>`;
-            bannerEl.classList.remove('hidden');
-        }
-
-        const CATEGORY = {
-            cardiac:    { bar: 'bg-rose-500',   pill: 'bg-rose-100 text-rose-700',     label: 'Cardiac' },
-            neuro:      { bar: 'bg-violet-500', pill: 'bg-violet-100 text-violet-700', label: 'Neuro' },
-            ortho:      { bar: 'bg-amber-500',  pill: 'bg-amber-100 text-amber-700',   label: 'Orthopedic' },
-            vascular:   { bar: 'bg-teal-500',   pill: 'bg-teal-100 text-teal-700',     label: 'Vascular' },
-            ophthalmic: { bar: 'bg-cyan-500',   pill: 'bg-cyan-100 text-cyan-700',     label: 'Ophthalmic' },
-            general:    { bar: 'bg-slate-400',  pill: 'bg-slate-100 text-slate-600',   label: 'General' },
-        };
-        const SAFETY_STYLE = {
-            'mri':        'bg-indigo-100 text-indigo-700',
-            'latex':      'bg-red-100 text-red-700',
-            'no-latex':   'bg-emerald-100 text-emerald-700',
-            'single-use': 'bg-slate-100 text-slate-600',
-            'sterile':    'bg-sky-100 text-sky-700',
-        };
-
-        function deviceCard(d) {
-            const cat = CATEGORY[d.category] || CATEGORY.general;
-            const recalled = d.recall_flag;
-            const critical = recalled && d.recall && d.recall.indicator === 'critical';
-            const cardBorder = recalled ? (critical ? 'border-red-300 ring-2 ring-red-200'
-                                                     : 'border-amber-300 ring-2 ring-amber-200')
-                                        : 'border-slate-200';
-            const recallBadge = recalled
-                ? badge(`RECALL · ${(d.recall && d.recall.classification) || ''}`,
-                        critical ? 'bg-red-600 text-white' : 'bg-amber-500 text-white') : '';
-            const recallDetail = recalled && d.recall ? `
-                <div class="mt-3 text-sm rounded-lg p-2.5 ${critical ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'}">
-                    <span class="font-semibold">FDA recall ${d.recall.recall_number || ''}:</span> ${d.recall.reason || ''}
-                </div>` : '';
-            const gmdn = d.type ? `${d.type}${d.gmdn_code ? ` <span class="text-slate-400">(GMDN ${d.gmdn_code})</span>` : ''}` : '—';
-            const safetyChips = (d.safety || [])
-                .filter(s => s.display)
-                .map(s => badge(s.display, SAFETY_STYLE[s.code] || 'bg-slate-100 text-slate-600'))
-                .join(' ');
-            return `
-            <div class="bg-white rounded-2xl shadow-sm border ${cardBorder} overflow-hidden flex flex-col">
-                <div class="h-1.5 ${cat.bar}"></div>
-                <div class="p-4 flex flex-col h-full">
-                    <div class="flex items-start justify-between gap-2">
-                        <h3 class="font-semibold text-slate-800 leading-snug">${d.name}</h3>
-                        ${d.us_core ? badge('US Core', 'bg-blue-100 text-blue-700') : badge('EHR', 'bg-slate-100 text-slate-500')}
-                    </div>
-                    <div class="flex flex-wrap gap-1 mt-2">
-                        ${badge(cat.label, cat.pill)}
-                        ${recallBadge}
-                        ${badge(d.status || 'unknown', 'bg-slate-100 text-slate-600')}
-                    </div>
-                    <p class="text-sm text-slate-500 mt-3">${gmdn}</p>
-                    <dl class="text-sm text-slate-600 mt-2 space-y-1">
-                        <div class="flex justify-between gap-2"><dt class="text-slate-400">Manufacturer</dt><dd class="text-right">${d.manufacturer || '—'}</dd></div>
-                        <div class="flex justify-between gap-2"><dt class="text-slate-400">Model</dt><dd class="text-right">${d.model || '—'}</dd></div>
-                        <div class="flex justify-between gap-2"><dt class="text-slate-400">UDI-DI</dt><dd class="text-right font-mono text-xs">${d.device_identifier || '—'}</dd></div>
-                        <div class="flex justify-between gap-2"><dt class="text-slate-400">Expires</dt><dd class="text-right">${(d.expiration_date || '—').split('T')[0]}</dd></div>
-                    </dl>
-                    ${safetyChips ? `<div class="flex flex-wrap gap-1 mt-3">${safetyChips}</div>` : ''}
-                    ${recallDetail}
-                    <div class="text-xs text-slate-400 mt-auto pt-3">
-                        <a class="text-blue-600 hover:underline" href="${d.fhir_url}" target="_blank">FHIR Device/${d.id}</a>
-                        · ${(d.last_updated || '').split('T')[0]}
-                    </div>
-                </div>
-            </div>`;
-        }
-
-        async function load() {
-            try {
-                const res = await fetch(`/patient/${patientId}/devices`);
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                if (data.patient) renderPatient(data.patient);
-                renderBanner(data.recalls);
-                const devices = data.devices || [];
-                document.getElementById('device-count').textContent =
-                    `${devices.length} device${devices.length === 1 ? '' : 's'} on chart`;
-                if (!devices.length) {
-                    grid.className = '';
-                    grid.innerHTML = `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
-                        No devices documented yet.
-                        <div class="mt-3"><a class="text-blue-600 underline" href="/scan-to-chart">Document one now →</a></div>
-                    </div>`;
-                    return;
-                }
-                grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
-                grid.innerHTML = devices.map(deviceCard).join('');
-            } catch (e) {
-                grid.className = '';
-                grid.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700">
-                    Could not load chart: ${e.message}</div>`;
-            }
-        }
-        load();
-    </script>
+        grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
+        grid.innerHTML = devices.map(deviceCard).join('');
+      } catch (e) {
+        grid.className = '';
+        grid.innerHTML = `<div class="rounded-2xl p-4" style="background:var(--coral-soft);color:var(--coral-deep);">Could not load chart: ${esc(e.message)}</div>`;
+      }
+    }
+    load();
+  </script>
 </body>
 </html>
