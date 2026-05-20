@@ -130,57 +130,57 @@
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        <!-- Patient chart -->
-        <a href="/patients" class="surface lift p-6 block fade-up d1 relative overflow-hidden" style="background: var(--primary-soft);">
+        <!-- Patient chart (pale blue) -->
+        <a href="/patients" class="lift p-6 block fade-up d1 relative overflow-hidden" style="background: #E7EFFB; border: 1px solid #CBDDF5; border-radius: 20px;">
           <div class="absolute -right-8 -bottom-8 opacity-10 pointer-events-none">
             <svg width="140" height="140" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="35" r="15" stroke="var(--primary)" stroke-width="2"/>
-              <path d="M22 92 C22 70, 35 60, 50 60 C65 60, 78 70, 78 92" stroke="var(--primary)" stroke-width="2" fill="none"/>
+              <circle cx="50" cy="35" r="15" stroke="#2D5C9E" stroke-width="2"/>
+              <path d="M22 92 C22 70, 35 60, 50 60 C65 60, 78 70, 78 92" stroke="#2D5C9E" stroke-width="2" fill="none"/>
             </svg>
           </div>
           <div class="relative">
-            <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white; box-shadow: var(--shadow-1);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #2D5C9E;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
             <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Patient chart</h3>
             <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
               Open a patient to see documented FHIR Devices, MRI-safety flags, and active recall status.
             </p>
-            <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--primary);">
+            <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: #2D5C9E;">
               Open chart
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </div>
           </div>
         </a>
 
-        <!-- Identify -->
-        <a href="/scan" class="surface lift p-6 block fade-up d2 relative" style="background: var(--surface);">
-          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: var(--slate-soft);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--slate-deep);"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+        <!-- Identify (pale orange) -->
+        <a href="/scan" class="lift p-6 block fade-up d2 relative" style="background: #FBEAD8; border: 1px solid #F3D6BA; border-radius: 20px;">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #9A5A1E;"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
           </div>
           <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Identify a device</h3>
           <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
             Scan or paste any UDI to query FDA GUDID directly. No patient context required.
           </p>
-          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--slate-deep);">
+          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: #9A5A1E;">
             Look up
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </div>
         </a>
 
-        <!-- Scan-to-chart (primary) -->
-        <a href="/scan-to-chart" class="surface lift p-6 block fade-up d3 relative overflow-hidden" style="background: linear-gradient(165deg, #F2EAF0 0%, #EFE6EC 100%); border: 1.5px solid var(--primary);">
+        <!-- Scan-to-chart (pale green, recommended) -->
+        <a href="/scan-to-chart" class="lift p-6 block fade-up d3 relative overflow-hidden" style="background: #E3EFE9; border: 1.5px solid #2E6A55; border-radius: 20px;">
           <div class="absolute top-5 right-5">
-            <span class="chip" style="background: var(--primary); color: white;">Recommended</span>
+            <span class="chip" style="background: #2E6A55; color: white;">Recommended</span>
           </div>
-          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white; box-shadow: var(--shadow-1);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><path d="M20 6 9 17l-5-5"/></svg>
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #2E6A55;"><path d="M20 6 9 17l-5-5"/></svg>
           </div>
           <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Scan-to-chart</h3>
           <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
             UDI in. US Core FHIR Device out, linked to the patient and recall-checked — in seconds.
           </p>
-          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--primary);">
+          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: #2E6A55;">
             Document a device
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </div>
