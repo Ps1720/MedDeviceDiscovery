@@ -25,8 +25,8 @@
   }
   html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .font-mono { font-family: 'DM Mono', monospace; }
-  .surface { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-1); }
-  .surface-raised { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-2); }
+  .surface { background: var(--surface); border-radius: 18px; border: 1px solid var(--rule); }
+  .surface-raised { background: var(--surface); border-radius: 20px; border: 1px solid var(--rule); }
   /* Clean outlined device card — hairline border, no resting shadow */
   .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; transition: border-color 0.18s, transform 0.18s; }
   .card:hover { border-color: var(--ink-4); transform: translateY(-1px); }
@@ -44,7 +44,7 @@
   <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary); box-shadow: var(--shadow-1);">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary);">
           <div class="grid grid-cols-2 gap-0.5">
             <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
             <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
@@ -67,7 +67,7 @@
     <div class="surface-raised p-6 mb-5">
       <div class="flex items-start justify-between gap-4 flex-wrap">
         <div class="flex items-center gap-4">
-          <div class="w-16 h-16 rounded-full flex items-center justify-center text-white shrink-0" style="background: linear-gradient(135deg, var(--primary), var(--primary-deep)); box-shadow: var(--shadow-1);">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center text-white shrink-0" style="background: linear-gradient(135deg, var(--primary), var(--primary-deep));">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-9 h-9">
               <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"/>
             </svg>
@@ -177,8 +177,7 @@
         return chip(s.display.replace('MRI: ', ''), st.bg, st.fg);
       }).join(' ');
       return `
-      <div class="card overflow-hidden flex flex-col" style="${border}">
-        <div style="height:5px;background:${cat.bar};"></div>
+      <div class="card flex flex-col" style="${border}">
         <div class="p-4 flex flex-col h-full">
           <div class="flex items-start justify-between gap-2">
             <h3 class="font-semibold text-[15px] leading-snug" style="color:var(--ink);">${esc(d.name)}</h3>
