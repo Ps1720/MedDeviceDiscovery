@@ -10,17 +10,19 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   :root {
-    --bg: #FAF6F4; --surface: #FFFFFF; --surface-warm: #FDF6F3; --surface-cool: #F5F0F2;
-    --ink: #2A1E2E; --ink-2: #5A4A5E; --ink-3: #7E6E82; --ink-4: #ADA2B0;
-    --rule: #ECE3E5; --rule-soft: #F4EEEF;
-    --primary: #6B3D5C; --primary-soft: #EFE2EA; --primary-deep: #4A2A40;
+    /* Cool neutrals + burgundy accent (kept) */
+    --bg: #F6F7F9; --surface: #FFFFFF; --surface-warm: #F1F4F7; --surface-cool: #E9EDF2;
+    --ink: #1B2230; --ink-2: #3A4150; --ink-3: #59616F; --ink-4: #8A93A2;
+    --rule: #E2E6EC; --rule-soft: #EDF0F4;
+    --primary: #6B3D5C; --primary-soft: #EFE6EC; --primary-deep: #4A2A40;
     --blush: #E89B95; --blush-soft: #FBE5E2; --blush-deep: #B8665E;
     --coral: #D86A4A; --coral-soft: #FAE0D5; --coral-deep: #8E3D24;
     --honey: #D4A04B; --honey-soft: #F7EAD0; --honey-deep: #8A6324;
     --slate: #6E7D9C; --slate-soft: #DEE3EE; --slate-deep: #45527A;
-    --shadow-1: 0 1px 2px rgba(42,30,46,0.04), 0 2px 4px rgba(42,30,46,0.04);
-    --shadow-2: 0 4px 12px rgba(42,30,46,0.06), 0 2px 4px rgba(42,30,46,0.04);
-    --shadow-3: 0 12px 32px rgba(42,30,46,0.08), 0 4px 12px rgba(42,30,46,0.06);
+    --emerald-soft: #E2EFE9; --emerald-deep: #2E6A55;
+    --shadow-1: 0 1px 2px rgba(20,28,45,0.05), 0 2px 4px rgba(20,28,45,0.04);
+    --shadow-2: 0 4px 12px rgba(20,28,45,0.07), 0 2px 4px rgba(20,28,45,0.05);
+    --shadow-3: 0 12px 32px rgba(20,28,45,0.10), 0 4px 12px rgba(20,28,45,0.07);
   }
   html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .font-mono { font-family: 'DM Mono', monospace; }
@@ -44,8 +46,8 @@
 <body class="min-h-screen">
 
   <!-- Top nav -->
-  <header class="sticky top-0 z-30" style="background: rgba(250,246,244,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+  <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary); box-shadow: var(--shadow-1);">
           <div class="grid grid-cols-2 gap-0.5">
@@ -65,19 +67,19 @@
           <span class="dot pulse-dot" style="background: var(--slate);"></span>
           FHIR connected
         </span>
-        <span class="chip hidden md:inline-flex" style="background: var(--blush-soft); color: var(--blush-deep);">
+        <span class="chip hidden md:inline-flex" style="background: var(--primary-soft); color: var(--primary-deep);">
           AMIA 2026
         </span>
       </div>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-6 py-10">
+  <main class="max-w-7xl mx-auto px-6 py-10">
 
     <!-- Hero -->
     <section class="mb-10 fade-up">
-      <div class="chip mb-5" style="background: var(--blush-soft); color: var(--blush-deep);">
-        <span class="dot" style="background: var(--blush);"></span>
+      <div class="chip mb-5" style="background: var(--primary-soft); color: var(--primary-deep);">
+        <span class="dot" style="background: var(--primary);"></span>
         Perioperative · Device · Documentation
       </div>
       <h1 class="text-[44px] md:text-[58px] leading-[1.05] font-semibold tracking-tight" style="color: var(--ink);">
@@ -129,22 +131,22 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         <!-- Patient chart -->
-        <a href="/patients" class="surface lift p-6 block fade-up d1 relative overflow-hidden" style="background: var(--blush-soft);">
-          <div class="absolute -right-8 -bottom-8 opacity-15 pointer-events-none">
+        <a href="/patients" class="surface lift p-6 block fade-up d1 relative overflow-hidden" style="background: var(--primary-soft);">
+          <div class="absolute -right-8 -bottom-8 opacity-10 pointer-events-none">
             <svg width="140" height="140" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="35" r="15" stroke="var(--blush-deep)" stroke-width="2"/>
-              <path d="M22 92 C22 70, 35 60, 50 60 C65 60, 78 70, 78 92" stroke="var(--blush-deep)" stroke-width="2" fill="none"/>
+              <circle cx="50" cy="35" r="15" stroke="var(--primary)" stroke-width="2"/>
+              <path d="M22 92 C22 70, 35 60, 50 60 C65 60, 78 70, 78 92" stroke="var(--primary)" stroke-width="2" fill="none"/>
             </svg>
           </div>
           <div class="relative">
             <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: white; box-shadow: var(--shadow-1);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--blush-deep);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
             <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Patient chart</h3>
             <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
               Open a patient to see documented FHIR Devices, MRI-safety flags, and active recall status.
             </p>
-            <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--blush-deep);">
+            <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--primary);">
               Open chart
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </div>
@@ -153,21 +155,21 @@
 
         <!-- Identify -->
         <a href="/scan" class="surface lift p-6 block fade-up d2 relative" style="background: var(--surface);">
-          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: var(--honey-soft);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--honey-deep);"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background: var(--slate-soft);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--slate-deep);"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
           </div>
           <h3 class="font-semibold text-[18px] mb-2" style="color: var(--ink);">Identify a device</h3>
           <p class="text-[14px] leading-[1.55] mb-5" style="color: var(--ink-2);">
             Scan or paste any UDI to query FDA GUDID directly. No patient context required.
           </p>
-          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--honey-deep);">
+          <div class="inline-flex items-center gap-1.5 text-[13px] font-semibold" style="color: var(--slate-deep);">
             Look up
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </div>
         </a>
 
         <!-- Scan-to-chart (primary) -->
-        <a href="/scan-to-chart" class="surface lift p-6 block fade-up d3 relative overflow-hidden" style="background: linear-gradient(165deg, #FBE5E2 0%, #EFE2EA 100%); border: 1.5px solid var(--primary);">
+        <a href="/scan-to-chart" class="surface lift p-6 block fade-up d3 relative overflow-hidden" style="background: linear-gradient(165deg, #F2EAF0 0%, #EFE6EC 100%); border: 1.5px solid var(--primary);">
           <div class="absolute top-5 right-5">
             <span class="chip" style="background: var(--primary); color: white;">Recommended</span>
           </div>
@@ -217,10 +219,10 @@
           <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--primary-deep);">100<span class="text-[20px]">%</span></div>
           <div class="text-[12px] mt-2" style="color: var(--primary-deep);">v8.0.1 · validated</div>
         </div>
-        <div class="p-5 rounded-2xl" style="background: var(--blush-soft);">
-          <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--blush-deep); opacity: 0.85;">Scan → FHIR</div>
-          <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--blush-deep);">&lt;2<span class="text-[20px]">s</span></div>
-          <div class="text-[12px] mt-2" style="color: var(--blush-deep);">UDI to documented Device</div>
+        <div class="p-5 rounded-2xl" style="background: var(--emerald-soft);">
+          <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--emerald-deep); opacity: 0.85;">Scan → FHIR</div>
+          <div class="text-[36px] font-semibold leading-none number-display" style="color: var(--emerald-deep);">&lt;2<span class="text-[20px]">s</span></div>
+          <div class="text-[12px] mt-2" style="color: var(--emerald-deep);">UDI to documented Device</div>
         </div>
         <div class="p-5 rounded-2xl" style="background: var(--slate-soft);">
           <div class="text-[11px] font-mono uppercase tracking-wider mb-2" style="color: var(--slate-deep); opacity: 0.85;">FHIR</div>
