@@ -52,14 +52,14 @@ services:
     build: ./services/gudid-core
     container_name: periop-udi-gudid-core
     ports:
-      - "5000:5000"
+      - "8090:8090"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - HOST_IP=${HOST_IP}
-      - PORT=5000
+      - PORT=8090
       - FLASK_ENV=${FLASK_ENV:-production}
       - FHIR_BASE_URL=http://hapi:8080/fhir
     volumes:
@@ -71,14 +71,14 @@ services:
     build: ./services/gudid-core
     container_name: periop-udi-gudid-core-dev
     ports:
-      - "5000:5000"
+      - "8090:8090"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - HOST_IP=${HOST_IP}
-      - PORT=5000
+      - PORT=8090
       - FLASK_ENV=development
       - FHIR_BASE_URL=http://hapi:8080/fhir
     volumes:
