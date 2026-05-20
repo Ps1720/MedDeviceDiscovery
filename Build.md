@@ -205,25 +205,22 @@ periop-udi/
 **Goal**: Convert a GUDID record into a US Core v8.0.1 Implantable Device Profile-conformant FHIR Device resource, validate it, write it to HAPI.
 
 **Tasks**:
-- [ ] Implement `services/fhir-bridge/gudid_to_uscore_device.py`:
-  - Function signature: `map_to_device(gudid_record: dict, patient_id: str) -> dict`
+- [x] Implement `services/fhir-bridge/gudid_to_uscore_device.py`:
+  - `map_to_device(gudid_record, patient_id=None, *, udi_hrf, serial_number, lot_number, expiration_date, manufacture_date, issuing_agency) -> dict`
   - Returns a FHIR Device resource as a Python dict
-  - Populates: `meta.profile` (US Core Implantable Device), `udiCarrier` (deviceIdentifier, issuer, jurisdiction, carrierHRF), `manufacturer`, `deviceName`, `type` (with GMDN coding), `status`, `patient` reference
-- [ ] Implement `services/fhir-bridge/hapi_client.py`:
-  - `create_device(device_resource) -> str` returns the Device's logical ID
-  - `link_to_procedure(device_id, procedure_id)` updates Procedure.focalDevice
-  - `get_patient_devices(patient_id) -> list`
-- [ ] Implement `services/fhir-bridge/tests/validate_against_ig.py`:
-  - Downloads HL7 FHIR Validator CLI on first run
-  - Validates a generated Device against US Core v8.0.1
-  - Used by CI and as a standalone CLI: `python validate_against_ig.py <file>`
-- [ ] Write `tests/test_mapper.py` with 5+ sample GUDID records → expected Device output
-- [ ] Acceptance test: 100% of mapped resources pass US Core validation
+  - Populates `meta.profile` (US Core Implantable Device), `udiCarrier` (deviceIdentifier, issuer, carrierHRF), `manufacturer`, `deviceName`, `modelNumber`, `distinctIdentifier`, `type` (GMDN coding + text), production identifiers, `status`, `patient` reference
+- [x] Implement `services/fhir-bridge/hapi_client.py`:
+  - `create_device(device_resource) -> str` (logical id), `link_to_procedure` (Procedure.focalDevice via JSON Patch), `get_patient_devices`, plus `validate` ($validate)
+- [x] Implement `services/fhir-bridge/tests/validate_against_ig.py` (HL7 FHIR Validator CLI; used in Phase 7 CI)
+- [x] Write `tests/test_mapper.py` with 5 sample GUDID records (+ live US Core validation)
+- [x] Acceptance test: 100% of mapped resources pass US Core validation
 
-**Acceptance**:
-- `pytest services/fhir-bridge/tests` all green
-- Generated Devices validate clean against US Core v8.0.1
-- A Device created via the mapper appears in HAPI and is retrievable
+**Acceptance**: ✅ all met (2026-05-19)
+- `pytest services/fhir-bridge/tests` → **17 passed** (run with `requests` on the compose network)
+- Generated Devices validate clean against **US Core v8.0.1** (0 errors; GMDN terminology
+  warnings only, non-blocking)
+- A mapped Device POSTs to HAPI (**HTTP 201**) and is retrievable via `Device?patient=...`
+- Discovered & handled: US Core requires **`Device.type` (min=1)** — mapper always emits one
 
 **Hand to Claude Code prompt**:
 > *"Implement Phase 2. Build the GUDID-to-US-Core-Device mapper per BUILD.md section 4 Phase 2. Use the FHIR R4 spec and US Core v8.0.1 Implantable Device Profile. Validate output using the HL7 FHIR Validator CLI. Write tests with at least 5 sample GUDID records."*
@@ -552,4 +549,4 @@ If any of these is missing 2 weeks before the deadline, **cut Bulk Data and Subs
 
 ---
 
-*Last updated: 2026-05-19 — Phase 1 complete (HAPI R4 + US Core v8.0.1 + validation, seeded 65 Synthea patients; browse UI at http://localhost:8080/). Phase 0 also complete.*
+*Last updated: 2026-05-19 — Phase 2 complete (GUDID → US Core v8.0.1 Device mapper + HAPI client; 17 tests pass, 100% US Core-valid). Phases 0 & 1 also complete.*
