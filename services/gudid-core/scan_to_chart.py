@@ -197,11 +197,57 @@ def _human_name(patient: dict) -> str:
     return full or f"(unnamed {patient.get('id', '?')})"
 
 
+def get_patient_summary(patient_id: str) -> dict:
+    """Fetch lightweight demographics for the patient header (name, sex, age, DOB, MRN)."""
+    summary = {"id": patient_id, "name": f"Patient {patient_id}", "gender": None,
+               "birth_date": None, "age": None, "mrn": None}
+    try:
+        resp = requests.get(
+            f"{FHIR_BASE_URL}/Patient/{patient_id}",
+            headers={"Accept": "application/fhir+json"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        p = resp.json()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[scan-to-chart] patient summary unavailable: {exc}")
+        return summary
+
+    summary["name"] = _human_name(p)
+    summary["gender"] = p.get("gender")
+    summary["birth_date"] = p.get("birthDate")
+    summary["age"] = _age_from(p.get("birthDate"))
+    for idf in p.get("identifier", []) or []:
+        coding = ((idf.get("type") or {}).get("coding") or [{}])[0]
+        if coding.get("code") == "MR" and idf.get("value"):
+            summary["mrn"] = idf["value"]
+            break
+    else:
+        ids = p.get("identifier") or []
+        if ids:
+            summary["mrn"] = ids[0].get("value")
+    return summary
+
+
+def _age_from(birth_date: Optional[str]) -> Optional[int]:
+    if not birth_date:
+        return None
+    try:
+        y, m, d = (birth_date.split("T")[0].split("-") + ["1", "1"])[:3]
+        from datetime import date
+        b = date(int(y), int(m), int(d))
+        today = date.today()
+        return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def get_patient_chart(patient_id: str) -> dict:
     """
-    Return the patient's device timeline plus recall cards from the CDS Hooks
-    recall-check service. Each device is annotated with any matching recall.
+    Return the patient's demographics, device timeline, and recall cards from the
+    CDS Hooks recall-check service. Each device is annotated with any matching recall.
     """
+    patient = get_patient_summary(patient_id)
     devices = _client().get_patient_devices(patient_id)
     cards = get_patient_recall_cards(patient_id)
 
@@ -230,7 +276,7 @@ def get_patient_chart(patient_id: str) -> dict:
         entries.append(entry)
 
     entries.sort(key=lambda e: e["last_updated"] or "", reverse=True)
-    return {"devices": entries, "recalls": cards}
+    return {"patient": patient, "devices": entries, "recalls": cards}
 
 
 def get_patient_timeline(patient_id: str) -> list[dict]:

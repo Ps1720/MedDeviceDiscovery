@@ -3,47 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PeriopUDI — Patient Device Timeline</title>
+    <title>PeriopUDI — Patient Device Chart</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 min-h-screen">
-    <div class="max-w-3xl mx-auto p-6">
-        <header class="mb-6 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-800">Device Timeline</h1>
-                <p class="text-slate-500">Patient <span class="font-mono">{{ patient_id }}</span></p>
-            </div>
-            <a href="/scan-to-chart" class="bg-blue-600 text-white px-4 py-2 rounded-lg">+ Document device</a>
-        </header>
+    <div class="max-w-7xl mx-auto px-6 py-6">
 
+        <!-- Patient header bar -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-400 font-semibold">Perioperative Device Chart</p>
+                    <h1 id="patient-name" class="text-2xl font-bold text-slate-800 mt-1">Loading…</h1>
+                    <div id="patient-meta" class="flex flex-wrap gap-2 mt-2"></div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <a href="/scan-to-chart" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
+                            + Document device
+                        </a>
+                        <p id="device-count" class="text-xs text-slate-400 mt-2"></p>
+                    </div>
+                    <div id="avatar" class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl font-bold shadow-inner">
+                        ?
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recall alert banner -->
         <div id="recall-banner" class="hidden mb-4"></div>
 
-        <div id="timeline" class="space-y-3">
-            <p class="text-slate-400">Loading…</p>
+        <!-- Device grid -->
+        <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <p class="text-slate-400">Loading devices…</p>
         </div>
     </div>
 
     <script>
         const patientId = {{ patient_id | tojson }};
-        const container = document.getElementById('timeline');
+        const grid = document.getElementById('grid');
         const bannerEl = document.getElementById('recall-banner');
 
-        function badge(text, cls) {
-            return `<span class="text-xs px-2 py-0.5 rounded-full ${cls}">${text}</span>`;
+        const badge = (t, c) => `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${c}">${t}</span>`;
+        const chip  = (label, val) => `<span class="text-sm bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
+            <span class="text-slate-400">${label}</span> ${val}</span>`;
+
+        function initials(name) {
+            const parts = (name || '').replace(/[0-9]/g, '').trim().split(/\s+/).filter(Boolean);
+            return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
+        }
+
+        function renderPatient(p) {
+            document.getElementById('patient-name').textContent = p.name || ('Patient ' + p.id);
+            document.getElementById('avatar').textContent = initials(p.name);
+            const meta = document.getElementById('patient-meta');
+            const bits = [];
+            bits.push(chip('ID', p.id));
+            if (p.mrn) bits.push(chip('MRN', p.mrn));
+            if (p.gender) bits.push(chip('Sex', p.gender));
+            if (p.age != null) bits.push(chip('Age', p.age));
+            if (p.birth_date) bits.push(chip('DOB', p.birth_date));
+            meta.innerHTML = bits.join('');
         }
 
         function renderBanner(recalls) {
             if (!recalls || !recalls.length) { bannerEl.classList.add('hidden'); return; }
-            const hasCritical = recalls.some(c => c.indicator === 'critical');
-            bannerEl.className = 'mb-4 rounded-xl p-4 border ' +
-                (hasCritical ? 'bg-red-100 border-red-300' : 'bg-amber-100 border-amber-300');
+            const critical = recalls.some(c => c.indicator === 'critical');
+            bannerEl.className = 'mb-4 rounded-2xl p-4 border ' +
+                (critical ? 'bg-red-100 border-red-300' : 'bg-amber-100 border-amber-300');
             bannerEl.innerHTML = `
                 <div class="flex items-start gap-3">
-                    <span class="text-2xl">${hasCritical ? '⛔' : '⚠️'}</span>
+                    <span class="text-2xl">${critical ? '⛔' : '⚠️'}</span>
                     <div>
-                        <h2 class="font-bold ${hasCritical ? 'text-red-800' : 'text-amber-800'}">
+                        <h2 class="font-bold ${critical ? 'text-red-800' : 'text-amber-800'}">
                             ${recalls.length} device recall alert${recalls.length > 1 ? 's' : ''} for this patient</h2>
-                        <ul class="text-sm mt-1 list-disc ml-5 ${hasCritical ? 'text-red-700' : 'text-amber-800'}">
+                        <ul class="text-sm mt-1 list-disc ml-5 ${critical ? 'text-red-700' : 'text-amber-800'}">
                             ${recalls.map(c => `<li>${c.summary}</li>`).join('')}
                         </ul>
                     </div>
@@ -51,60 +86,69 @@
             bannerEl.classList.remove('hidden');
         }
 
+        function deviceCard(d) {
+            const recalled = d.recall_flag;
+            const critical = recalled && d.recall && d.recall.indicator === 'critical';
+            const topBar = recalled ? (critical ? 'bg-red-500' : 'bg-amber-500')
+                : (d.us_core ? 'bg-blue-500' : 'bg-slate-300');
+            const recallBadge = recalled
+                ? badge(`RECALL · ${(d.recall && d.recall.classification) || ''}`,
+                        critical ? 'bg-red-600 text-white' : 'bg-amber-500 text-white') : '';
+            const recallDetail = recalled && d.recall ? `
+                <div class="mt-3 text-sm rounded-lg p-2.5 ${critical ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'}">
+                    <span class="font-semibold">FDA recall ${d.recall.recall_number || ''}:</span> ${d.recall.reason || ''}
+                </div>` : '';
+            return `
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                <div class="h-1.5 ${topBar}"></div>
+                <div class="p-4 flex flex-col h-full">
+                    <div class="flex items-start justify-between gap-2">
+                        <h3 class="font-semibold text-slate-800 leading-snug">${d.name}</h3>
+                        ${d.us_core ? badge('US Core', 'bg-blue-100 text-blue-700') : badge('EHR', 'bg-slate-100 text-slate-500')}
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        ${recallBadge}
+                        ${badge(d.status || 'unknown', 'bg-slate-100 text-slate-600')}
+                    </div>
+                    <dl class="text-sm text-slate-600 mt-3 space-y-1">
+                        <div class="flex justify-between gap-2"><dt class="text-slate-400">Manufacturer</dt><dd class="text-right">${d.manufacturer || '—'}</dd></div>
+                        <div class="flex justify-between gap-2"><dt class="text-slate-400">Model</dt><dd class="text-right">${d.model || '—'}</dd></div>
+                        <div class="flex justify-between gap-2"><dt class="text-slate-400">UDI-DI</dt><dd class="text-right font-mono text-xs">${d.device_identifier || '—'}</dd></div>
+                        <div class="flex justify-between gap-2"><dt class="text-slate-400">Expires</dt><dd class="text-right">${(d.expiration_date || '—').split('T')[0]}</dd></div>
+                    </dl>
+                    ${recallDetail}
+                    <div class="text-xs text-slate-400 mt-auto pt-3">
+                        <a class="text-blue-600 hover:underline" href="${d.fhir_url}" target="_blank">FHIR Device/${d.id}</a>
+                        · ${(d.last_updated || '').split('T')[0]}
+                    </div>
+                </div>
+            </div>`;
+        }
+
         async function load() {
             try {
                 const res = await fetch(`/patient/${patientId}/devices`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
+                if (data.patient) renderPatient(data.patient);
                 renderBanner(data.recalls);
                 const devices = data.devices || [];
+                document.getElementById('device-count').textContent =
+                    `${devices.length} device${devices.length === 1 ? '' : 's'} on chart`;
                 if (!devices.length) {
-                    container.innerHTML = `<div class="bg-white rounded-xl shadow p-6 text-center text-slate-500">
-                        No devices documented for this patient yet.
+                    grid.className = '';
+                    grid.innerHTML = `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
+                        No devices documented yet.
                         <div class="mt-3"><a class="text-blue-600 underline" href="/scan-to-chart">Document one now →</a></div>
                     </div>`;
                     return;
                 }
-                container.innerHTML = devices.map(d => {
-                    const recalled = d.recall_flag;
-                    const critical = recalled && d.recall && d.recall.indicator === 'critical';
-                    const borderCls = recalled ? (critical ? 'border-red-500' : 'border-amber-500')
-                        : (d.us_core ? 'border-blue-500' : 'border-slate-300');
-                    const recallBadge = recalled
-                        ? badge(`RECALL · ${d.recall && d.recall.classification || ''}`,
-                                critical ? 'bg-red-600 text-white' : 'bg-amber-500 text-white')
-                        : '';
-                    const recallDetail = recalled && d.recall ? `
-                        <div class="mt-2 text-sm rounded-lg p-2 ${critical ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'}">
-                            <span class="font-semibold">FDA recall ${d.recall.recall_number || ''}:</span>
-                            ${d.recall.reason || ''}
-                        </div>` : '';
-                    return `
-                    <div class="bg-white rounded-xl shadow p-4 border-l-4 ${borderCls}">
-                        <div class="flex items-center justify-between">
-                            <h3 class="font-semibold text-slate-800">${d.name}</h3>
-                            <div class="space-x-1">
-                                ${d.us_core ? badge('US Core', 'bg-blue-100 text-blue-700') : ''}
-                                ${recallBadge}
-                                ${badge(d.status || 'unknown', 'bg-slate-100 text-slate-600')}
-                            </div>
-                        </div>
-                        <dl class="text-sm text-slate-600 mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
-                            <div><span class="font-medium">Manufacturer:</span> ${d.manufacturer || '—'}</div>
-                            <div><span class="font-medium">Model:</span> ${d.model || '—'}</div>
-                            <div><span class="font-medium">UDI-DI:</span> ${d.device_identifier || '—'}</div>
-                            <div><span class="font-medium">Expires:</span> ${d.expiration_date || '—'}</div>
-                        </dl>
-                        ${recallDetail}
-                        <div class="text-xs text-slate-400 mt-2">
-                            Documented ${d.last_updated || ''} ·
-                            <a class="text-blue-600 underline" href="${d.fhir_url}" target="_blank">FHIR Device/${d.id}</a>
-                        </div>
-                    </div>`;
-                }).join('');
+                grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
+                grid.innerHTML = devices.map(deviceCard).join('');
             } catch (e) {
-                container.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
-                    Could not load timeline: ${e.message}</div>`;
+                grid.className = '';
+                grid.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700">
+                    Could not load chart: ${e.message}</div>`;
             }
         }
         load();
