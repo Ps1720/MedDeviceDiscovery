@@ -28,3 +28,6 @@ infrastructure/hapi/data/
 
 # Eval data populated during pilot (keep .gitkeep, ignore real logs)
 eval/usage_logs/*.csv
+
+# CDS Hooks recall cache (regenerated at runtime)
+services/cds-hooks/data/*.db

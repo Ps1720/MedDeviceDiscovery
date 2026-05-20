@@ -27,7 +27,7 @@ from gudid_service import get_device_from_gudid, parse_udi, search_devices
 from scan_to_chart import (
     document_device,
     list_patients,
-    get_patient_timeline,
+    get_patient_chart,
 )
 
 app = Flask(__name__)
@@ -208,9 +208,10 @@ def api_patients():
 
 @app.route("/patient/<patient_id>/devices")
 def api_patient_devices(patient_id):
-    """JSON list of a patient's documented devices (newest first)."""
+    """A patient's documented devices (newest first) plus any recall cards."""
     try:
-        return jsonify({"patient_id": patient_id, "devices": get_patient_timeline(patient_id)})
+        chart = get_patient_chart(patient_id)
+        return jsonify({"patient_id": patient_id, **chart})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Could not reach FHIR server: {exc}"}), 502
 

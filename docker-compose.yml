@@ -42,11 +42,29 @@ services:
     environment:
       - FHIR_BASE_URL=http://hapi:8080/fhir
       - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
+      - CDS_HOOKS_URL=http://cds-hooks:5001
       - PATIENT_COUNT=${PATIENT_COUNT:-50}
     volumes:
       - ./infrastructure/synthea:/synthea-work
     profiles:
       - seed
+
+  # ---- CDS Hooks recall-surveillance service (Phase 5) ----
+  cds-hooks:
+    build: ./services/cds-hooks
+    container_name: periop-udi-cds-hooks
+    depends_on:
+      hapi:
+        condition: service_started
+    ports:
+      - "8091:5001"
+    environment:
+      - PORT=5001
+      - FHIR_BASE_URL=http://hapi:8080/fhir
+      - RECALLS_DB_PATH=/app/data/recalls.db
+    volumes:
+      - ./services/cds-hooks/data:/app/data
+    restart: unless-stopped
 
   # ---- GUDID core app (existing STA app; moved off 8080) ----
   # Built from the repo root so the image includes the fhir-bridge modules.
@@ -67,6 +85,7 @@ services:
       - FLASK_ENV=${FLASK_ENV:-production}
       - FHIR_BASE_URL=http://hapi:8080/fhir
       - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
+      - CDS_HOOKS_URL=http://cds-hooks:5001
     volumes:
       - ./services/gudid-core/static/qr_codes:/app/static/qr_codes
       - ./services/gudid-core/data:/app/data
@@ -90,6 +109,7 @@ services:
       - FLASK_ENV=development
       - FHIR_BASE_URL=http://hapi:8080/fhir
       - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
+      - CDS_HOOKS_URL=http://cds-hooks:5001
     volumes:
       - ./services/gudid-core:/app
       - ./services/fhir-bridge/gudid_to_uscore_device.py:/app/gudid_to_uscore_device.py

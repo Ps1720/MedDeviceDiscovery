@@ -28,6 +28,8 @@ FHIR_BASE_URL = os.environ.get("FHIR_BASE_URL", "http://localhost:8080/fhir")
 # Browser-reachable base for display links (the container talks to HAPI via the
 # internal "hapi" hostname, but the user's browser needs localhost).
 PUBLIC_FHIR_BASE_URL = os.environ.get("PUBLIC_FHIR_BASE_URL", "http://localhost:8080/fhir")
+# CDS Hooks recall-surveillance service (Phase 5).
+CDS_HOOKS_URL = os.environ.get("CDS_HOOKS_URL")
 SCAN_LOG = Path(os.environ.get("SCAN_LOG_PATH", "eval/usage_logs/scans.csv"))
 _SCAN_LOG_FIELDS = [
     "timestamp",
@@ -195,12 +197,67 @@ def _human_name(patient: dict) -> str:
     return full or f"(unnamed {patient.get('id', '?')})"
 
 
-def get_patient_timeline(patient_id: str) -> list[dict]:
-    """Return simplified Device entries for a patient, newest first."""
+def get_patient_chart(patient_id: str) -> dict:
+    """
+    Return the patient's device timeline plus recall cards from the CDS Hooks
+    recall-check service. Each device is annotated with any matching recall.
+    """
     devices = _client().get_patient_devices(patient_id)
-    entries = [_simplify_device(d) for d in devices]
+    cards = get_patient_recall_cards(patient_id)
+
+    # Index recalls by the device's logical id and by UDI-DI for annotation.
+    by_device_id: dict[str, dict] = {}
+    by_di: dict[str, dict] = {}
+    for card in cards:
+        if card.get("deviceId"):
+            by_device_id[str(card["deviceId"])] = card
+        if card.get("deviceIdentifier"):
+            by_di[card["deviceIdentifier"]] = card
+
+    entries = []
+    for d in devices:
+        entry = _simplify_device(d)
+        card = by_device_id.get(str(entry["id"])) or by_di.get(entry["device_identifier"])
+        if card:
+            entry["recall_flag"] = True
+            entry["recall"] = {
+                "classification": card.get("classification"),
+                "reason": card.get("reason"),
+                "recall_number": card.get("recallNumber"),
+                "indicator": card.get("indicator"),
+                "summary": card.get("summary"),
+            }
+        entries.append(entry)
+
     entries.sort(key=lambda e: e["last_updated"] or "", reverse=True)
-    return entries
+    return {"devices": entries, "recalls": cards}
+
+
+def get_patient_timeline(patient_id: str) -> list[dict]:
+    """Backward-compatible: just the annotated device entries, newest first."""
+    return get_patient_chart(patient_id)["devices"]
+
+
+def get_patient_recall_cards(patient_id: str) -> list[dict]:
+    """Query the CDS Hooks recall-check service for this patient's recall cards."""
+    if not CDS_HOOKS_URL:
+        return []
+    try:
+        resp = requests.post(
+            f"{CDS_HOOKS_URL}/cds-services/recall-check",
+            json={
+                "hook": "patient-view",
+                "hookInstance": "periopudi-timeline",
+                "context": {"patientId": patient_id},
+                "fhirServer": FHIR_BASE_URL,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json().get("cards", [])
+    except Exception as exc:  # recall surveillance is advisory; never break the chart
+        print(f"[scan-to-chart] recall-check unavailable: {exc}")
+        return []
 
 
 def _simplify_device(device: dict) -> dict:
@@ -221,6 +278,7 @@ def _simplify_device(device: dict) -> dict:
         "status": device.get("status"),
         "last_updated": (device.get("meta") or {}).get("lastUpdated"),
         "us_core": US_CORE_IMPLANTABLE_DEVICE in profiles,
-        "recall_flag": False,  # placeholder until Phase 5 (CDS Hooks recall surveillance)
+        "recall_flag": False,  # set True by get_patient_chart when a recall matches
+        "recall": None,
         "fhir_url": f"{PUBLIC_FHIR_BASE_URL}/Device/{device.get('id')}",
     }

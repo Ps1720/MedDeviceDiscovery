@@ -150,3 +150,40 @@ end-to-end in seconds, with the result visible on a patient timeline.
 - `scans.csv` is gitignored (eval data populated at runtime).
 
 ---
+
+## Phase 5 — FDA Recall Feed + CDS Hooks Service  *(2026-05-19, complete)*
+
+**Goal:** The innovation moment — real-time recall surveillance via CDS Hooks. A patient with a
+recalled device lights up an unmissable alert at the point of care.
+
+**What was done:**
+- New **`cds-hooks`** service (own container, host **:8091** → container 5001):
+  - `recalls.py` — SQLite cache (`recalls` table keyed by UDI-DI) + lookup.
+  - `recall_poller.py` — seeds curated **demo** recalls (real GUDID DIs, `source=demo`) and does a
+    best-effort pull of the openFDA `device/recall` feed.
+  - `app.py` — CDS Hooks 2.0 endpoints: `GET /cds-services` (discovery, advertises `recall-check`
+    on `patient-view`) and `POST /cds-services/recall-check` (fetches the patient's Devices from
+    the supplied `fhirServer`, matches DIs against the cache, returns Cards). `Class I` →
+    `indicator: critical`, else `warning`.
+- **Timeline integration:** `gudid-core` calls the CDS Hooks `recall-check` for the patient
+  (`CDS_HOOKS_URL`), annotates each device with any matching recall, and renders a red/amber
+  **recall banner** + per-device **RECALL badges** with the recall reason. The endpoint
+  `GET /patient/<id>/devices` now returns `{devices, recalls}`.
+- `make recalls` target to refresh the cache.
+
+**Verification:**
+- Discovery returns a valid CDS Hooks service catalog.
+- Patient with the recalled Abbott XIENCE (Class II) → **warning** Card; patient with the Medtronic
+  MOSAIC (Class I) → **critical** Card; the timeline shows the banner + badges.
+- Clean patient (no recalled devices) → **empty** `cards` array.
+
+**openFDA caveat (documented honestly):** openFDA's device-recall feed is keyed by product
+code / recalling firm and does **not** carry the UDI-DI, so those records generally won't match a
+specific scanned device. DI-level matching therefore uses curated demo entries (clearly marked
+`source=demo`); a production deployment would integrate a UDI-DI-indexed recall source. The demo
+recalls guarantee the workflow lights up.
+
+**Note:** the two seeded demo recalls (XIENCE `08717648200274` Class II; MOSAIC `00643169001763`
+Class I) are illustrative, not actual FDA recalls.
+
+---

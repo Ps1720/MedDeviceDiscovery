@@ -1,4 +1,4 @@
-.PHONY: help up hapi down demo seed test validate evaluation-report
+.PHONY: help up hapi down demo seed recalls test validate evaluation-report
 
 help:
 	@echo "PeriopUDI — make targets"
@@ -7,6 +7,7 @@ help:
 	@echo "  down                Stop the stack"
 	@echo "  demo                Reset state and bring up the full demo stack"
 	@echo "  seed                Generate Synthea patients and load them into HAPI   (Phase 1)"
+	@echo "  recalls             Refresh the device-recall cache (demo + openFDA)     (Phase 5)"
 	@echo "  test                Run all service test suites                          (Phase 2+)"
 	@echo "  validate            Validate FHIR output against US Core v8.0.1          (Phase 2/7)"
 	@echo "  evaluation-report   Run the evaluation notebook and emit a report        (Phase 8)"
@@ -32,6 +33,12 @@ seed:
 	docker-compose --profile seed run --build --rm synthea-seed
 	@echo "Patient count:"
 	@curl -s "http://localhost:8080/fhir/Patient?_summary=count" | head -c 400; echo
+
+# Refresh the recall cache (seeds demo recalls + best-effort openFDA pull).
+recalls:
+	docker-compose exec cds-hooks python recall_poller.py
+	@echo "Recall cache:"
+	@curl -s "http://localhost:8091/health"; echo
 
 test:
 	@echo "Phase 2+: run pytest across services once tests exist."
