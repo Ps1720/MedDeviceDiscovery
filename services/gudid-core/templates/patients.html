@@ -1,69 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PeriopUDI — Choose a Patient</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeriopUDI — Patients</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #F6F7F9; --surface: #FFFFFF; --surface-warm: #F1F4F7; --surface-cool: #E9EDF2;
+    --ink: #1B2230; --ink-2: #3A4150; --ink-3: #59616F; --ink-4: #8A93A2;
+    --rule: #E2E6EC; --rule-soft: #EDF0F4;
+    --primary: #6B3D5C; --primary-soft: #EFE6EC; --primary-deep: #4A2A40;
+    --slate: #6E7D9C; --slate-soft: #DEE3EE; --slate-deep: #45527A;
+    --shadow-1: 0 1px 2px rgba(20,28,45,0.05), 0 2px 4px rgba(20,28,45,0.04);
+    --shadow-2: 0 4px 12px rgba(20,28,45,0.07), 0 2px 4px rgba(20,28,45,0.05);
+    --shadow-3: 0 12px 32px rgba(20,28,45,0.10), 0 4px 12px rgba(20,28,45,0.07);
+  }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .font-mono { font-family: 'DM Mono', monospace; }
+  .surface-raised { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-2); }
+  .row { transition: background 0.15s; }
+  .row:hover { background: var(--surface-warm); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
+  .btn-open {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; color: var(--primary);
+    background: var(--primary-soft); transition: all 0.15s;
+  }
+  .row:hover .btn-open { background: var(--primary); color: white; }
+  .search-field {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1.5px solid var(--rule);
+    border-radius: 16px; padding: 16px 20px; box-shadow: var(--shadow-1);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search-field:focus-within { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+</style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div class="max-w-3xl mx-auto px-6 py-8">
-        <header class="mb-5 flex items-center justify-between">
-            <div>
-                <a href="/" class="text-sm text-slate-400 hover:text-slate-600">← Home</a>
-                <h1 class="text-2xl font-bold text-slate-800 mt-1">Choose a patient</h1>
-                <p class="text-slate-500 text-sm">Open a patient to view and document their devices.</p>
-            </div>
-        </header>
+<body class="min-h-screen">
 
-        <input id="filter" type="text" placeholder="Filter by name or ID…"
-            class="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-
-        <div id="list" class="space-y-2">
-            <p class="text-slate-400">Loading patients…</p>
+  <!-- App bar -->
+  <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary); box-shadow: var(--shadow-1);">
+          <div class="grid grid-cols-2 gap-0.5">
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+          </div>
         </div>
+        <div>
+          <div class="font-semibold text-[15px]" style="color: var(--ink);">PeriopUDI</div>
+          <div class="text-[11px]" style="color: var(--ink-3);">Patients</div>
+        </div>
+      </a>
+      <a href="/scan-to-chart" class="btn-open">+ Document a device</a>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <div class="mb-6">
+      <a href="/" class="text-[13px]" style="color: var(--ink-4);">← Home</a>
+      <h1 class="text-[28px] font-semibold tracking-tight mt-1" style="color: var(--ink);">Patients</h1>
+      <p class="text-[14px]" style="color: var(--ink-3);">Open a patient to view and document their devices.</p>
     </div>
 
-    <script>
-        let allPatients = [];
-        const listEl = document.getElementById('list');
-        const filterEl = document.getElementById('filter');
+    <!-- Big search bar -->
+    <div class="search-field mb-5">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ink-3);"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+      <input id="filter" type="text" placeholder="Search patients by name, MRN, or ID…"
+        class="flex-1 bg-transparent border-0 focus:outline-none text-[16px]" style="color: var(--ink);">
+      <span id="count" class="chip" style="background: var(--surface-cool); color: var(--ink-3);">—</span>
+    </div>
 
-        function initials(name) {
-            const parts = (name || '').replace(/[0-9]/g, '').trim().split(/\s+/).filter(Boolean);
-            return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
-        }
+    <!-- Patient table -->
+    <div class="surface-raised overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4); background: var(--surface-warm);">
+              <th class="py-3 px-5 font-medium">Patient</th>
+              <th class="py-3 px-4 font-medium">MRN</th>
+              <th class="py-3 px-4 font-medium">Sex</th>
+              <th class="py-3 px-4 font-medium">Age</th>
+              <th class="py-3 px-4 font-medium">Date of birth</th>
+              <th class="py-3 px-4 font-medium">Patient ID</th>
+              <th class="py-3 px-5 font-medium text-right">Chart</th>
+            </tr>
+          </thead>
+          <tbody id="rows" style="color: var(--ink-2);">
+            <tr><td colspan="7" class="py-8 px-5 text-center text-[14px]" style="color: var(--ink-4);">Loading patients…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
 
-        function render(patients) {
-            if (!patients.length) { listEl.innerHTML = '<p class="text-slate-400">No matching patients.</p>'; return; }
-            listEl.innerHTML = patients.map(p => `
-                <a href="/patient/${p.id}/timeline" class="flex items-center gap-3 bg-white rounded-xl border border-slate-200 p-3 hover:shadow-md transition">
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-sm font-bold shrink-0">${initials(p.name)}</div>
-                    <div class="flex-1">
-                        <div class="font-medium text-slate-800">${p.name}</div>
-                        <div class="text-xs text-slate-400">Patient ID ${p.id}</div>
-                    </div>
-                    <span class="text-slate-300">→</span>
-                </a>`).join('');
-        }
+  <script>
+    const esc = s => (s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+    let allPatients = [];
+    const rowsEl = document.getElementById('rows');
+    const filterEl = document.getElementById('filter');
+    const countEl = document.getElementById('count');
 
-        filterEl.addEventListener('input', () => {
-            const q = filterEl.value.trim().toLowerCase();
-            render(allPatients.filter(p => p.name.toLowerCase().includes(q) || String(p.id).includes(q)));
-        });
+    function initials(name) {
+      const parts = (name || '').replace(/[0-9]/g, '').trim().split(/\s+/).filter(Boolean);
+      return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
+    }
+    const cell = (v) => `<td class="py-3 px-4 text-[14px]">${v == null || v === '' ? '<span style="color:var(--ink-4)">—</span>' : esc(v)}</td>`;
 
-        async function load() {
-            try {
-                const res = await fetch('/api/patients?limit=200');
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                allPatients = data.patients || [];
-                render(allPatients);
-            } catch (e) {
-                listEl.innerHTML = `<p class="text-red-500">Could not load patients: ${e.message}</p>`;
-            }
-        }
-        load();
-    </script>
+    function render(list) {
+      countEl.textContent = `${list.length} patient${list.length === 1 ? '' : 's'}`;
+      if (!list.length) {
+        rowsEl.innerHTML = `<tr><td colspan="7" class="py-8 px-5 text-center text-[14px]" style="color: var(--ink-4);">No matching patients.</td></tr>`;
+        return;
+      }
+      rowsEl.innerHTML = list.map(p => `
+        <tr class="row cursor-pointer border-t" style="border-color: var(--rule-soft);" onclick="location.href='/patient/${esc(p.id)}/timeline'">
+          <td class="py-3 px-5">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white shrink-0" style="background: linear-gradient(135deg, var(--primary), var(--primary-deep));">${esc(initials(p.name))}</div>
+              <span class="font-medium text-[14px]" style="color: var(--ink);">${esc(p.name)}</span>
+            </div>
+          </td>
+          ${cell(p.mrn ? (String(p.mrn).length > 12 ? String(p.mrn).slice(0, 8) + '…' : p.mrn) : '')}
+          ${cell(p.gender)}
+          ${cell(p.age != null ? p.age : '')}
+          ${cell(p.birth_date)}
+          <td class="py-3 px-4 text-[13px] font-mono" style="color: var(--ink-3);">${esc(p.id)}</td>
+          <td class="py-3 px-5 text-right"><span class="btn-open">Open <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></td>
+        </tr>`).join('');
+    }
+
+    filterEl.addEventListener('input', () => {
+      const q = filterEl.value.trim().toLowerCase();
+      render(allPatients.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        String(p.id).includes(q) ||
+        String(p.mrn || '').toLowerCase().includes(q)));
+    });
+
+    async function load() {
+      try {
+        const res = await fetch('/api/patients?limit=200');
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        allPatients = data.patients || [];
+        render(allPatients);
+      } catch (e) {
+        rowsEl.innerHTML = `<tr><td colspan="7" class="py-8 px-5 text-center" style="color: #8E3D24;">Could not load patients: ${esc(e.message)}</td></tr>`;
+      }
+    }
+    load();
+  </script>
 </body>
 </html>

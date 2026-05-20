@@ -167,21 +167,39 @@ def _log_scan(row: dict) -> None:
 
 
 def list_patients(limit: int = 50) -> list[dict]:
-    """Return [{id, name}] for the patient picker, sorted by name."""
+    """Return patient demographics for the picker table, sorted by name."""
     resp = requests.get(
         f"{FHIR_BASE_URL}/Patient",
-        params={"_count": limit, "_elements": "name"},
+        params={"_count": limit, "_elements": "name,gender,birthDate,identifier"},
         headers={"Accept": "application/fhir+json"},
-        timeout=15,
+        timeout=20,
     )
     resp.raise_for_status()
     bundle = resp.json()
-    patients = []
-    for entry in bundle.get("entry", []):
-        res = entry.get("resource", {})
-        patients.append({"id": res.get("id"), "name": _human_name(res)})
+    patients = [_summarize_patient(e.get("resource", {})) for e in bundle.get("entry", [])]
     patients.sort(key=lambda p: p["name"].lower())
     return patients
+
+
+def _summarize_patient(p: dict) -> dict:
+    """Build {id, name, gender, birth_date, age, mrn} from a Patient resource."""
+    mrn = None
+    ids = p.get("identifier", []) or []
+    for idf in ids:
+        coding = ((idf.get("type") or {}).get("coding") or [{}])[0]
+        if coding.get("code") == "MR" and idf.get("value"):
+            mrn = idf["value"]
+            break
+    if mrn is None and ids:
+        mrn = ids[0].get("value")
+    return {
+        "id": p.get("id"),
+        "name": _human_name(p),
+        "gender": p.get("gender"),
+        "birth_date": p.get("birthDate"),
+        "age": _age_from(p.get("birthDate")),
+        "mrn": mrn,
+    }
 
 
 def _human_name(patient: dict) -> str:
@@ -213,20 +231,7 @@ def get_patient_summary(patient_id: str) -> dict:
         print(f"[scan-to-chart] patient summary unavailable: {exc}")
         return summary
 
-    summary["name"] = _human_name(p)
-    summary["gender"] = p.get("gender")
-    summary["birth_date"] = p.get("birthDate")
-    summary["age"] = _age_from(p.get("birthDate"))
-    for idf in p.get("identifier", []) or []:
-        coding = ((idf.get("type") or {}).get("coding") or [{}])[0]
-        if coding.get("code") == "MR" and idf.get("value"):
-            summary["mrn"] = idf["value"]
-            break
-    else:
-        ids = p.get("identifier") or []
-        if ids:
-            summary["mrn"] = ids[0].get("value")
-    return summary
+    return _summarize_patient(p)
 
 
 def _age_from(birth_date: Optional[str]) -> Optional[int]:
