@@ -121,6 +121,17 @@
 
   .number-display { font-feature-settings: 'tnum'; }
 
+  .del-x {
+    position: absolute; top: 10px; right: 10px;
+    width: 24px; height: 24px; border-radius: 999px;
+    background: var(--coral); color: #fff; font-size: 17px; line-height: 1;
+    display: none; align-items: center; justify-content: center;
+    border: none; cursor: pointer; z-index: 5; box-shadow: var(--shadow-1);
+  }
+  .del-x:hover { background: var(--coral-deep); }
+  .editing .del-x { display: flex; }
+  .device-tile { transition: opacity 0.2s; }
+
   .grain-bg {
     background-color: var(--bg);
     background-image:
@@ -444,10 +455,13 @@
             Recently <span style="color: var(--ink-3); font-style: italic;">documented.</span>
           </h2>
         </div>
-        <a href="/tools" class="text-[13px] font-semibold inline-flex items-center gap-1.5" style="color: var(--primary);">
-          Device tools
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
+        <div class="flex items-center gap-4">
+          <button id="recent-edit" class="text-[13px] font-semibold" style="color: var(--ink-3);">Edit</button>
+          <a href="/tools" class="text-[13px] font-semibold inline-flex items-center gap-1.5" style="color: var(--primary);">
+            Device tools
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
       </div>
       <div id="recent" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <p class="text-[14px]" style="color: var(--ink-4);">Loading…</p>
@@ -599,7 +613,8 @@
           return;
         }
         el.innerHTML = devices.map((d, i) => `
-          <a href="/patient/${esc(d.patient_id)}/timeline" class="surface lift p-5 block fade-up d${(i % 4) + 1}">
+          <a href="/patient/${esc(d.patient_id)}/timeline" class="device-tile surface lift p-5 block fade-up d${(i % 4) + 1} relative">
+            <button class="del-x" title="Delete device" onclick="deleteDevice('${esc(d.id)}', this)">&times;</button>
             ${chipFor(d)}
             <h4 class="font-semibold text-[15px] mb-1" style="color: var(--ink);">${esc(d.name)}</h4>
             <p class="text-[12.5px]" style="color: var(--ink-3);">${esc(d.manufacturer || '—')}</p>
@@ -613,6 +628,29 @@
       }
     }
     loadRecent();
+
+    // ---- Edit / delete ----
+    const recentGrid = document.getElementById('recent');
+    document.getElementById('recent-edit').addEventListener('click', function () {
+      const editing = recentGrid.classList.toggle('editing');
+      this.textContent = editing ? 'Done' : 'Edit';
+      this.style.color = editing ? 'var(--coral-deep)' : 'var(--ink-3)';
+    });
+
+    async function deleteDevice(id, btn) {
+      // In an <a> card: prevent navigation.
+      if (window.event) { window.event.preventDefault(); window.event.stopPropagation(); }
+      if (!confirm('Delete this device from the chart?')) return;
+      try {
+        const res = await fetch('/api/device/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error('server refused');
+        const card = btn.closest('.device-tile');
+        if (card) { card.style.opacity = '0'; setTimeout(() => card.remove(), 200); }
+      } catch (e) {
+        alert('Could not delete device: ' + e.message);
+      }
+    }
   </script>
 </body>
 </html>

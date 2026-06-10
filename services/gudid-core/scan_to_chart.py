@@ -289,6 +289,20 @@ def get_patient_timeline(patient_id: str) -> list[dict]:
     return get_patient_chart(patient_id)["devices"]
 
 
+def delete_device(device_id: str) -> bool:
+    """Delete a Device from HAPI. Returns True on success."""
+    try:
+        resp = requests.delete(
+            f"{FHIR_BASE_URL}/Device/{device_id}",
+            headers={"Accept": "application/fhir+json"},
+            timeout=15,
+        )
+        return resp.status_code < 300
+    except Exception as exc:  # noqa: BLE001
+        print(f"[scan-to-chart] delete failed for Device/{device_id}: {exc}")
+        return False
+
+
 def get_recent_devices(limit: int = 8) -> list[dict]:
     """Recently documented US Core devices across all patients, newest first."""
     resp = requests.get(

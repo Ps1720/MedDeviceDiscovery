@@ -29,6 +29,7 @@ from scan_to_chart import (
     list_patients,
     get_patient_chart,
     get_recent_devices,
+    delete_device,
 )
 
 app = Flask(__name__)
@@ -74,6 +75,13 @@ def index():
 def patients_page():
     """Patient picker — choose a patient to open their device chart."""
     return render_template("patients.html")
+
+
+@app.route("/api/device/<device_id>", methods=["DELETE"])
+def api_delete_device(device_id):
+    """Delete a documented Device from the FHIR store."""
+    ok = delete_device(device_id)
+    return jsonify({"success": ok, "device_id": device_id}), (200 if ok else 502)
 
 
 @app.route("/api/recent-devices")
