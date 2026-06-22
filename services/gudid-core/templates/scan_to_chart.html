@@ -4,44 +4,189 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PeriopUDI — Document Device to Chart</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --bg: #F6F7F9; --surface: #FFFFFF; --surface-warm: #F1F4F7; --surface-cool: #E9EDF2;
+        --ink: #1B2230; --ink-2: #3A4150; --ink-3: #59616F; --ink-4: #8A93A2;
+        --rule: #E2E6EC; --rule-soft: #EDF0F4;
+        --primary: #6B3D5C; --primary-soft: #EFE6EC; --primary-deep: #4A2A40;
+        --coral: #D86A4A; --coral-soft: #FAE0D5; --coral-deep: #8E3D24;
+        --honey: #D4A04B; --honey-soft: #F7EAD0; --honey-deep: #8A6324;
+        --slate: #6E7D9C; --slate-soft: #DEE3EE; --slate-deep: #45527A;
+        --emerald-soft: #E2EFE9; --emerald-deep: #2E6A55;
+        --sky-soft: #DCEEF4; --sky-deep: #245C73;
+      }
+      html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+      .font-mono { font-family: 'DM Mono', monospace; }
+      .surface { background: var(--surface); border-radius: 18px; border: 1px solid var(--rule); }
+      .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+      .field { width: 100%; border: 1px solid var(--rule); border-radius: 12px; padding: 9px 12px; background: var(--surface); font-size: 14px; }
+      .field:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+      .btn-primary {
+        width: 100%; padding: 11px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;
+        color: #fff; background: var(--primary); transition: all 0.15s;
+      }
+      .btn-primary:hover { background: var(--primary-deep); }
+      .btn-primary:disabled { opacity: 0.5; }
+      #protocol-panel:empty { display: none; }
+    </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div class="max-w-2xl mx-auto p-6">
+<body class="min-h-screen">
+    <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+      <div class="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary);">
+            <div class="grid grid-cols-2 gap-0.5">
+              <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+              <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+              <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+              <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+            </div>
+          </div>
+          <div>
+            <div class="font-semibold text-[15px]" style="color: var(--ink);">PeriopUDI</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">Document device to chart</div>
+          </div>
+        </a>
+        <a href="/patients" class="text-[13px] font-semibold" style="color: var(--ink-3);">All patients →</a>
+      </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-6 py-8">
         <header class="mb-6">
-            <h1 class="text-2xl font-bold text-slate-800">Document Device to Chart</h1>
-            <p class="text-slate-500">Scan a UDI, pick a patient, and write a US Core Implantable
-            Device to their FHIR chart.</p>
+            <p class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4);">Scan to chart</p>
+            <h1 class="text-[26px] font-semibold tracking-tight mt-0.5">Document Device to Chart</h1>
+            <p class="text-[14px] mt-1" style="color: var(--ink-3);">Scan a UDI, pick a patient, and write a US Core
+            Implantable Device to their FHIR chart — with the perioperative protocol for covered device classes.</p>
         </header>
 
-        <div class="bg-white rounded-xl shadow p-6 space-y-4">
+        <div class="surface p-6 space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">UDI / Device Identifier</label>
-                <input id="udi" type="text" placeholder="e.g. 08717648200274 or full (01)... UDI"
-                    class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <label class="block text-[13px] font-semibold mb-1" style="color: var(--ink-2);">UDI / Device Identifier</label>
+                <input id="udi" type="text" placeholder="e.g. 08717648200274 or full (01)... UDI" class="field font-mono">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Patient</label>
-                <select id="patient"
-                    class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <div class="flex items-baseline justify-between mb-1">
+                    <label class="text-[13px] font-semibold" style="color: var(--ink-2);">Patient</label>
+                    <span id="patient-from-chart" class="hidden text-[11px]" style="color: var(--ink-4);"></span>
+                </div>
+                <select id="patient" class="field">
                     <option value="">Loading patients…</option>
                 </select>
             </div>
 
-            <button id="document-btn"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50">
-                Document Device
-            </button>
+            <!-- Implant location: revealed when the UDI resolves to a cardiac rhythm device -->
+            <div id="implant-block" class="hidden rounded-xl p-4 space-y-3" style="background: var(--surface-warm); border: 1px solid var(--rule);">
+                <div class="flex items-center justify-between gap-2">
+                    <label class="text-[13px] font-semibold" style="color: var(--ink-2);">Implant location</label>
+                    <span id="implant-device-hint" class="text-[11px]" style="color: var(--ink-4);"></span>
+                </div>
+                <div>
+                    <select id="lead-config" class="field"></select>
+                </div>
+                <div id="pocket-row" class="flex items-center gap-2">
+                    <span class="text-[12px]" style="color: var(--ink-3);">Pocket side</span>
+                    <div id="pocket-side" class="inline-flex gap-0.5 p-0.5 rounded-lg" style="background: var(--surface-cool);"></div>
+                </div>
+                <p class="text-[11px]" style="color: var(--ink-4);">
+                    Captured to the FHIR Device as a SNOMED-coded implant-site extension —
+                    this is what the chart's visual view renders as the confirmed location.
+                </p>
+            </div>
+
+            <button id="document-btn" class="btn-primary">Document Device</button>
         </div>
 
         <div id="result" class="mt-6 hidden"></div>
-    </div>
+        <div id="protocol-panel" class="mt-4 surface p-5 sm:p-8"></div>
+    </main>
 
+    <script src="/static/protocol_card.js"></script>
     <script>
         const patientSelect = document.getElementById('patient');
         const resultBox = document.getElementById('result');
+        const protocolBox = document.getElementById('protocol-panel');
         const btn = document.getElementById('document-btn');
+        const udiInput = document.getElementById('udi');
+        const implantBlock = document.getElementById('implant-block');
+        const leadSelect = document.getElementById('lead-config');
+        const pocketRow = document.getElementById('pocket-row');
+        const pocketBox = document.getElementById('pocket-side');
+
+        // ---- Implant-location capture (cardiac rhythm devices) ----
+        let implantOptions = null;   // protocol.implant_options for the current UDI
+        let pocketChoice = 'left';
+        let lookupToken = 0;
+        let lookupTimer = null;
+
+        function hideImplantBlock() {
+            implantOptions = null;
+            implantBlock.classList.add('hidden');
+        }
+
+        function showImplantBlock(protocol) {
+            implantOptions = protocol.implant_options;
+            if (!implantOptions) return hideImplantBlock();
+            document.getElementById('implant-device-hint').textContent = protocol.class_display;
+            leadSelect.innerHTML = implantOptions.lead_configs.map(c =>
+                `<option value="${c.code}" ${c.default ? 'selected' : ''}>${c.label}${c.default ? ' (typical)' : ''}</option>`
+            ).join('');
+            renderPocket();
+            implantBlock.classList.remove('hidden');
+        }
+
+        function renderPocket() {
+            const cfg = (implantOptions.lead_configs || []).find(c => c.code === leadSelect.value);
+            const noPocket = cfg && cfg.no_pocket;
+            pocketRow.style.display = noPocket ? 'none' : '';
+            if (noPocket) return;
+            pocketBox.innerHTML = implantOptions.pocket_sides.map(p => `
+                <button type="button" data-side="${p.code}" class="px-2.5 py-1 text-[11px] font-semibold rounded-md transition"
+                    style="${pocketChoice === p.code ? 'background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(20,28,45,0.08);' : 'color:var(--ink-4);'}">
+                    ${p.label}${p.default ? ' (typical)' : ''}
+                </button>`).join('');
+            pocketBox.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+                pocketChoice = b.dataset.side;
+                renderPocket();
+            }));
+        }
+        leadSelect.addEventListener('change', renderPocket);
+
+        async function preLookup() {
+            const udi = udiInput.value.trim();
+            if (udi.length < 10) return hideImplantBlock();
+            const token = ++lookupToken;
+            try {
+                const res = await fetch('/api/lookup/udi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ udi })
+                });
+                const data = await res.json();
+                if (token !== lookupToken) return; // stale response
+                if (data.found && data.protocol && data.protocol.module === 'cardiac_rhythm') {
+                    showImplantBlock(data.protocol);
+                } else {
+                    hideImplantBlock();
+                }
+            } catch (e) {
+                if (token === lookupToken) hideImplantBlock();
+            }
+        }
+        udiInput.addEventListener('input', () => {
+            hideImplantBlock();
+            clearTimeout(lookupTimer);
+            lookupTimer = setTimeout(preLookup, 600);
+        });
+
+        // When opened from a patient chart ("+ Document device"), the patient
+        // is already known — preselect them instead of asking again.
+        const presetPatientId = new URLSearchParams(location.search).get('patient_id');
 
         async function loadPatients() {
             try {
@@ -50,14 +195,30 @@
                 if (data.error) throw new Error(data.error);
                 patientSelect.innerHTML = '<option value="">Select a patient…</option>' +
                     data.patients.map(p => `<option value="${p.id}">${p.name} (id ${p.id})</option>`).join('');
+                if (presetPatientId) {
+                    const match = data.patients.find(p => String(p.id) === presetPatientId);
+                    if (!match) {
+                        // Not in the first page of results — add it so it can still be preselected.
+                        patientSelect.insertAdjacentHTML('beforeend',
+                            `<option value="${presetPatientId}">Patient ${presetPatientId}</option>`);
+                    }
+                    patientSelect.value = presetPatientId;
+                    const hint = document.getElementById('patient-from-chart');
+                    if (hint) {
+                        hint.textContent = 'from open chart — change if needed';
+                        hint.classList.remove('hidden');
+                    }
+                }
             } catch (e) {
                 patientSelect.innerHTML = `<option value="">Could not load patients: ${e.message}</option>`;
             }
         }
 
         function show(html, ok) {
-            resultBox.className = 'mt-6 rounded-xl shadow p-5 ' +
-                (ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200');
+            resultBox.className = 'mt-6 rounded-2xl p-5';
+            resultBox.style = ok
+                ? 'background:var(--emerald-soft);border:1px solid var(--emerald-deep);'
+                : 'background:var(--coral-soft);border:1px solid var(--coral);';
             resultBox.innerHTML = html;
             resultBox.classList.remove('hidden');
         }
@@ -65,38 +226,56 @@
         async function documentDevice() {
             const udi = document.getElementById('udi').value.trim();
             const patient_id = patientSelect.value;
-            if (!udi) return show('<p class="text-red-700">Enter a UDI or Device Identifier.</p>', false);
-            if (!patient_id) return show('<p class="text-red-700">Select a patient.</p>', false);
+            protocolBox.innerHTML = '';
+            if (!udi) return show('<p style="color:var(--coral-deep);">Enter a UDI or Device Identifier.</p>', false);
+            if (!patient_id) return show('<p style="color:var(--coral-deep);">Select a patient.</p>', false);
 
             btn.disabled = true; btn.textContent = 'Documenting…';
             const started = performance.now();
             try {
+                const body = { udi, patient_id };
+                if (implantOptions && !implantBlock.classList.contains('hidden')) {
+                    body.lead_config = leadSelect.value;
+                    const cfg = (implantOptions.lead_configs || []).find(c => c.code === leadSelect.value);
+                    if (!(cfg && cfg.no_pocket)) body.pocket_side = pocketChoice;
+                }
                 const res = await fetch('/scan-to-chart', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ udi, patient_id })
+                    body: JSON.stringify(body)
                 });
                 const data = await res.json();
                 const ms = Math.round(performance.now() - started);
                 if (data.success) {
+                    const implantLine = data.implant
+                        ? `<div><span class="font-semibold">Implant location:</span> ${(data.implant.sites || []).join(' + ')}${data.implant.pocket_side ? ` · ${data.implant.pocket_side} pocket` : ''} <span style="color:var(--emerald-deep);">(confirmed)</span></div>`
+                        : '';
+                    const implantWarn = data.implant_site_warning
+                        ? `<p class="text-[12px] mt-2" style="color:var(--honey-deep);">⚠ ${data.implant_site_warning}</p>`
+                        : '';
                     show(`
-                        <h2 class="text-lg font-semibold text-green-800 mb-2">✓ Device documented in ${ms} ms</h2>
-                        <dl class="text-sm text-slate-700 space-y-1">
-                            <div><span class="font-medium">Device:</span> ${data.brand_name || '—'} (${data.type || '—'})</div>
-                            <div><span class="font-medium">Manufacturer:</span> ${data.manufacturer || '—'}</div>
-                            <div><span class="font-medium">UDI-DI:</span> ${data.device_identifier}</div>
-                            <div><span class="font-medium">FHIR Device:</span>
-                                <a class="text-blue-600 underline" href="${data.fhir_url}" target="_blank">${data.device_id}</a></div>
+                        <h2 class="text-[16px] font-semibold mb-2" style="color:var(--emerald-deep);">✓ Device documented in ${ms} ms</h2>
+                        <dl class="text-[13px] space-y-1" style="color:var(--ink-2);">
+                            <div><span class="font-semibold">Device:</span> ${data.brand_name || '—'} (${data.type || '—'})</div>
+                            <div><span class="font-semibold">Manufacturer:</span> ${data.manufacturer || '—'}</div>
+                            <div><span class="font-semibold">UDI-DI:</span> <span class="font-mono">${data.device_identifier}</span></div>
+                            <div><span class="font-semibold">FHIR Device:</span>
+                                <a class="underline" style="color:var(--primary);" href="${data.fhir_url}" target="_blank">${data.device_id}</a></div>
+                            ${implantLine}
                         </dl>
+                        ${implantWarn}
                         <a href="/patient/${data.patient_id}/timeline"
-                           class="inline-block mt-4 bg-slate-800 text-white px-4 py-2 rounded-lg">View patient timeline →</a>
+                           class="inline-block mt-4 px-4 py-2 rounded-xl text-[13px] font-semibold text-white" style="background:var(--ink);">View patient timeline →</a>
                     `, true);
+                    if (data.protocol) {
+                        renderProtocolPanel(protocolBox, data.protocol, data.device_identifier);
+                    }
                 } else {
-                    show(`<h2 class="text-lg font-semibold text-red-800 mb-1">Could not document device</h2>
-                          <p class="text-red-700 text-sm">${data.error || 'Unknown error'}</p>`, false);
+                    show(`<h2 class="text-[15px] font-semibold mb-1" style="color:var(--coral-deep);">Could not document device</h2>
+                          <p class="text-[13px]" style="color:var(--coral-deep);">${data.error || 'Unknown error'}</p>`, false);
                 }
             } catch (e) {
-                show(`<p class="text-red-700">Request failed: ${e.message}</p>`, false);
+                show(`<p style="color:var(--coral-deep);">Request failed: ${e.message}</p>`, false);
             } finally {
                 btn.disabled = false; btn.textContent = 'Document Device';
             }

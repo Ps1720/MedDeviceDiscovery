@@ -23,6 +23,11 @@ import requests
 from gudid_service import parse_udi, get_device_from_gudid
 from gudid_to_uscore_device import map_to_device, US_CORE_IMPLANTABLE_DEVICE
 from hapi_client import HapiClient, FhirError
+import implant_sites
+import protocol_service
+from device_class_resolver import resolve_device_class
+
+DEVICE_SAFETY_SYSTEM = "https://periop-udi.local/fhir/CodeSystem/device-safety"
 
 FHIR_BASE_URL = os.environ.get("FHIR_BASE_URL", "http://localhost:8080/fhir")
 # Browser-reachable base for display links (the container talks to HAPI via the
@@ -79,6 +84,8 @@ def document_device(
     patient_id: str,
     procedure_id: Optional[str] = None,
     user: str = "demo",
+    lead_config: Optional[str] = None,
+    pocket_side: Optional[str] = None,
 ) -> dict:
     """
     Execute the scan-to-chart workflow and log it. Returns a result dict
@@ -104,6 +111,16 @@ def document_device(
                 "device_identifier": di,
             }
 
+        # Perioperative protocol enrichment is advisory — it must never block
+        # documentation of the device.
+        protocol = None
+        protocol_error = None
+        try:
+            protocol = protocol_service.build_protocol_block(record)
+        except Exception as exc:  # noqa: BLE001
+            protocol_error = f"{type(exc).__name__}: {exc}"
+            print(f"[scan-to-chart] protocol enrichment failed: {protocol_error}")
+
         device = map_to_device(
             record,
             patient_id=str(patient_id).strip(),
@@ -114,15 +131,54 @@ def document_device(
             expiration_date=production_ids.get("expiration_date"),
             manufacture_date=production_ids.get("manufacture_date"),
         )
+        _apply_institutional_mri_safety(device, protocol)
+
+        # Clinician-specified implant location (cardiac rhythm devices only).
+        # Advisory: a bad location must never block documentation.
+        implant = None
+        implant_site_warning = None
+        if lead_config and protocol and protocol.get("module") == "cardiac_rhythm":
+            try:
+                ext = implant_sites.build_implant_extension(
+                    protocol["device_class"], lead_config, pocket_side
+                )
+                implant_sites.upsert_implant_extension(device, ext)
+                implant = implant_sites.extract_implant(device)
+            except ValueError as exc:
+                implant_site_warning = str(exc)
+        elif lead_config:
+            implant_site_warning = (
+                "Implant location ignored: device is not a covered cardiac rhythm device"
+            )
 
         client = _client()
-        device_id = client.create_device(device)
+        try:
+            device_id = client.create_device(device)
+        except FhirError:
+            # If HAPI rejected the resource and we added the implant extension,
+            # retry once without it so documentation still succeeds.
+            if implant is None:
+                raise
+            remaining = [
+                e for e in device.get("extension", [])
+                if e.get("url") != implant_sites.IMPLANT_SITE_EXTENSION_URL
+            ]
+            if remaining:
+                device["extension"] = remaining
+            else:
+                device.pop("extension", None)
+            device_id = client.create_device(device)
+            implant = None
+            implant_site_warning = (
+                "FHIR server rejected the implant-site extension; "
+                "device documented without it"
+            )
 
         if procedure_id:
             client.link_to_procedure(device_id, procedure_id)
 
         success = True
-        return {
+        result = {
             "success": True,
             "device_id": device_id,
             "device_identifier": di,
@@ -132,7 +188,14 @@ def document_device(
             "manufacturer": record.get("manufacturer"),
             "type": record.get("type"),
             "profile": US_CORE_IMPLANTABLE_DEVICE,
+            "protocol": protocol,
+            "implant": implant,
         }
+        if protocol_error:
+            result["protocol_error"] = protocol_error
+        if implant_site_warning:
+            result["implant_site_warning"] = implant_site_warning
+        return result
     except FhirError as exc:
         return {"success": False, "error": str(exc), "device_identifier": di}
     except Exception as exc:  # noqa: BLE001 - surface any failure to the UI
@@ -151,6 +214,27 @@ def document_device(
                 "success": success,
             }
         )
+
+
+def _apply_institutional_mri_safety(device: dict, protocol: Optional[dict]) -> None:
+    """
+    When an institutional MRI override applies, record it on the FHIR Device as
+    an extra Device.safety coding (local code system). The fhir-bridge mapper
+    stays GUDID-pure; this institutional annotation belongs to the orchestrator.
+    """
+    if not protocol:
+        return
+    mri = (protocol.get("facts") or {}).get("mri") or {}
+    if mri.get("source") != "institution_override":
+        return
+    device.setdefault("safety", []).append({
+        "coding": [{
+            "system": DEVICE_SAFETY_SYSTEM,
+            "code": "mri-institutional",
+            "display": "MRI: institutional EP list — see PeriopUDI protocol",
+        }],
+        "text": "MRI: institutional EP list — see PeriopUDI protocol",
+    })
 
 
 def _log_scan(row: dict) -> None:
@@ -289,6 +373,59 @@ def get_patient_timeline(patient_id: str) -> list[dict]:
     return get_patient_chart(patient_id)["devices"]
 
 
+def set_implant_site(
+    device_id: str, lead_config: str, pocket_side: Optional[str] = None
+) -> dict:
+    """
+    Set or update the clinician-confirmed implant location on an already
+    documented Device (for devices documented before location capture, or
+    Synthea-seeded charts). Validates the location against the device's
+    resolved protocol class before writing.
+    """
+    try:
+        client = _client()
+        device = client.get_device(device_id)
+
+        resolved = resolve_device_class(_fhir_lite(device))
+        if not resolved or resolved.module != "cardiac_rhythm":
+            return {
+                "success": False,
+                "error": "Device is not a covered cardiac rhythm device",
+            }
+
+        ext = implant_sites.build_implant_extension(
+            resolved.class_key, lead_config, pocket_side
+        )
+        implant_sites.upsert_implant_extension(device, ext)
+        updated = client.update_device(device)
+        return {"success": True, "implant": implant_sites.extract_implant(updated)}
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+    except FhirError as exc:
+        return {"success": False, "error": str(exc)}
+    except Exception as exc:  # noqa: BLE001 - surface any failure to the UI
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _fhir_lite(device: dict) -> dict:
+    """FHIR Device -> minimal dict for the device-class resolver."""
+    names = device.get("deviceName") or []
+    name = names[0].get("name") if names else None
+    dtype = device.get("type", {}) if isinstance(device.get("type"), dict) else {}
+    gmdn_code = None
+    for c in dtype.get("coding") or []:
+        if c.get("code"):
+            gmdn_code = c["code"]
+            break
+    return {
+        "name": name,
+        "type": dtype.get("text"),
+        "gmdn_code": gmdn_code,
+        "manufacturer": device.get("manufacturer"),
+        "model": device.get("modelNumber"),
+    }
+
+
 def delete_device(device_id: str) -> bool:
     """Delete a Device from HAPI. Returns True on success."""
     try:
@@ -353,6 +490,7 @@ def get_patient_recall_cards(patient_id: str) -> list[dict]:
 _CATEGORY_RULES = [
     ("cardiac", ("stent", "coronary", "cardiac", "valve", "pacemaker", "defibrillator",
                  "icd", "heart", "aortic", "mitral")),
+    ("diabetes", ("insulin", "glucose", "cgm")),
     ("neuro", ("neuro", "deep brain", "spinal cord stim", "stimulator", "pulse generator",
                "shunt")),
     ("ortho", ("hip", "knee", "joint", "femoral", "spine", "spinal", "bone", "ortho",
@@ -387,12 +525,27 @@ def _simplify_device(device: dict) -> dict:
          ((c.get("coding") or [{}])[0].get("display"))}
         for c in (device.get("safety") or [])
     ]
+    # Protocol-coverage hint from FHIR-derived fields only (no GUDID call) —
+    # the full protocol block lazy-loads via /api/protocol/by-di/ on expand.
+    protocol_class = None
+    protocol_module = None
+    try:
+        resolved = resolve_device_class(_fhir_lite(device))
+        if resolved:
+            protocol_class = resolved.class_key
+            protocol_module = resolved.module
+    except Exception as exc:  # noqa: BLE001 - advisory only
+        print(f"[scan-to-chart] protocol class hint failed: {exc}")
     return {
         "id": device.get("id"),
         "name": name or type_text or "Device",
         "type": type_text,
         "gmdn_code": gmdn_code,
         "category": _categorize(name, type_text),
+        "protocol_class": protocol_class,
+        "protocol_module": protocol_module,
+        "protocol_available": protocol_class is not None,
+        "implant": implant_sites.extract_implant(device),
         "manufacturer": device.get("manufacturer"),
         "model": device.get("modelNumber"),
         "device_identifier": udi.get("deviceIdentifier"),

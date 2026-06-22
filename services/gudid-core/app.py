@@ -30,7 +30,12 @@ from scan_to_chart import (
     get_patient_chart,
     get_recent_devices,
     delete_device,
+    set_implant_site,
 )
+import overrides as institution_overrides
+import protocol_db
+import protocol_seed
+import protocol_service
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -42,6 +47,10 @@ app.config.from_object(Config)
 
 # Initialize database on startup
 init_db()
+
+# Perioperative protocol knowledge base (idempotent, version-gated reseed)
+protocol_db.init_db()
+protocol_seed.seed_protocols()
 
 
 # ============================================
@@ -223,6 +232,8 @@ def scan_to_chart_submit():
         patient_id=(data.get("patient_id") or "").strip(),
         procedure_id=(data.get("procedure_id") or "").strip() or None,
         user=(data.get("user") or "demo").strip() or "demo",
+        lead_config=(data.get("lead_config") or "").strip() or None,
+        pocket_side=(data.get("pocket_side") or "").strip() or None,
     )
     return jsonify(result), (200 if result.get("success") else 400)
 
@@ -382,10 +393,23 @@ def lookup_by_udi():
     """
     data = request.get_json()
     udi = data.get("udi", "").strip()
-    
+    context = (data.get("context") or "").strip() or protocol_service.DEFAULT_CONTEXT
+
     if not udi:
         return jsonify({"error": "No UDI provided"}), 400
-    
+
+    # A pure-numeric string is a bare Device Identifier (same rule as the
+    # scan-to-chart workflow's _resolve_di) — look it up directly.
+    if udi.isdigit():
+        device = get_device_from_gudid(udi)
+        if device:
+            return jsonify({
+                "found": True,
+                "device": device,
+                "protocol": _safe_protocol(device, context),
+                "redirect_url": f"/device/{udi}"
+            })
+
     # Parse UDI to extract DI
     parsed = parse_udi(udi)
     if parsed and parsed.get("di"):
@@ -396,22 +420,95 @@ def lookup_by_udi():
                 "found": True,
                 "device": device,
                 "parsed_udi": parsed,
+                "protocol": _safe_protocol(device, context),
                 "redirect_url": f"/device/{di}"
             })
-    
+
     # Try direct lookup with full UDI
     device = get_device_from_gudid(udi, is_udi=True)
     if device:
         return jsonify({
             "found": True,
             "device": device,
+            "protocol": _safe_protocol(device, context),
             "redirect_url": f"/device/{device.get('id', udi)}"
         })
-    
+
     return jsonify({
         "found": False,
         "message": "Device not found in GUDID",
         "udi": udi
+    })
+
+
+def _safe_protocol(record, context):
+    """Protocol enrichment is advisory — never let it break a lookup."""
+    try:
+        return protocol_service.build_protocol_block(record, context)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[protocol] failed to build protocol block: {exc}")
+        return None
+
+
+# ============================================
+# PERIOPERATIVE PROTOCOL LAYER
+# ============================================
+
+@app.route("/api/protocol/by-di/<di>")
+def api_protocol_by_di(di):
+    """
+    Perioperative protocol block for a device identifier (timeline expander
+    and context switching). GUDID lookups are TTL-cached in-process.
+    """
+    context = request.args.get("context", protocol_service.DEFAULT_CONTEXT)
+    if context not in protocol_db.CONTEXTS:
+        return jsonify({"error": f"context must be one of {list(protocol_db.CONTEXTS)}"}), 400
+    try:
+        protocol = protocol_service.build_protocol_for_di(di, context)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"found": False, "error": str(exc)}), 502
+    if protocol is None:
+        return jsonify({"found": False, "device_identifier": di})
+    return jsonify({"found": True, "device_identifier": di, "protocol": protocol})
+
+
+@app.route("/api/device/<device_id>/implant-site", methods=["PUT"])
+def api_set_implant_site(device_id):
+    """
+    Set the clinician-confirmed implant location on a documented Device.
+    Body: { "lead_config": str, "pocket_side"?: str }
+    """
+    data = request.get_json(silent=True) or {}
+    lead_config = (data.get("lead_config") or "").strip()
+    if not lead_config:
+        return jsonify({"success": False, "error": "lead_config is required"}), 400
+    result = set_implant_site(
+        device_id,
+        lead_config,
+        (data.get("pocket_side") or "").strip() or None,
+    )
+    if result.get("success"):
+        return jsonify(result)
+    error = result.get("error") or ""
+    status = 400 if ("not valid" in error or "not a covered" in error) else 502
+    return jsonify(result), status
+
+
+@app.route("/admin/overrides")
+def admin_overrides_page():
+    """Read-only view of institutional overrides (edited via the JSON file)."""
+    return render_template("admin_overrides.html")
+
+
+@app.route("/api/admin/overrides")
+def api_admin_overrides():
+    """Active institutional overrides plus any parse errors — read-only."""
+    data = institution_overrides.load_overrides()
+    return jsonify({
+        "institution": data["institution"],
+        "file": str(institution_overrides.OVERRIDES_PATH),
+        "overrides": institution_overrides.list_overrides(),
+        "errors": data["errors"],
     })
 
 

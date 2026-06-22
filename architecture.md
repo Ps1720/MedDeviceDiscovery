@@ -64,19 +64,51 @@ PeriopUDI is a three-service FHIR-based system with a local FHIR R4 foundation (
 - **gudid_service.py** - FDA GUDID API client
 - **hapi_client.py** - FHIR server integration (imported from fhir-bridge)
 - **qr_generator.py** - QR code image generation
+- **protocol_db.py / protocol_seed.py** - Perioperative protocol knowledge base (SQLite, version-gated startup seeding)
+- **device_class_resolver.py** - GUDID/FHIR record → protocol device class (brand/model > FDA product code > GMDN code > keyword)
+- **overrides.py** - Institutional override overlay (`data/institution_overrides.json`)
+- **protocol_service.py** - Protocol block assembly with per-field provenance (override > brand > class > GUDID)
+- **implant_sites.py** - Implant-location data model: per-class lead configs, SNOMED-coded FHIR Device extension (`…/StructureDefinition/implant-site`) builder/extractor. Extension present = clinician-confirmed; absent = typical-placement rendering
 - **Templates** - HTML5 UI pages
-- **Static** - CSS, JavaScript, generated QR codes
+- **Static** - CSS, JavaScript (`protocol_card.js` shared protocol panel; `heart_visual.js` 3D heart + magnet simulation, Three.js r128 lazy-loaded from CDN; `hv_test.html` headless-Chrome dev fixture), generated QR codes
 
 **Key Endpoints:**
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/` | GET | Home page, device search |
 | `/patient/<id>/timeline` | GET | Timeline view of patient's devices |
-| `/patient/<id>/devices` | GET | JSON API: patient's devices with recalls |
-| `/scan-to-chart` | GET/POST | Scan & document workflow |
-| `POST /api/lookup/udi` | POST | UDI → GUDID lookup |
+| `/patient/<id>/devices` | GET | JSON API: patient's devices with recalls + protocol hints |
+| `/scan-to-chart` | GET/POST | Scan & document workflow (returns `protocol` block) |
+| `POST /api/lookup/udi` | POST | UDI → GUDID lookup (+ `protocol` block; accepts bare DIs) |
+| `/api/protocol/by-di/<di>` | GET | Perioperative protocol for a DI (`?context=surgery\|mri\|ep_study`) |
+| `/api/device/<id>/implant-site` | PUT | Set clinician-confirmed implant location (lead_config, pocket_side) on a documented Device |
+| `/admin/overrides` | GET | Read-only institutional overrides admin page |
+| `/api/admin/overrides` | GET | JSON: active overrides + parse errors |
 | `/api/ask` | POST | AI assistant (Claude/OpenAI) |
 | `/health` | GET | Health check endpoint |
+
+**Perioperative Protocol Layer:**
+
+```
+UDI scan → GUDID record (extract_device_info)
+              │
+   device_class_resolver  (11 classes: pacemaker, leadless_pacemaker, icd, crt_p, crt_d,
+              │             vns, dbs, scs, insulin_pump, cgm, closed_loop)
+   protocol_service.build_protocol_block(record, context)
+       ├─ protocol_facts + checklist_items + brand_facts   (SQLite: data/protocols.db)
+       └─ institution_overrides.json merge (override > brand fact > class fact > raw GUDID)
+              │
+   `protocol` JSON block with per-field provenance → scan result panel / timeline expander
+```
+
+- Knowledge is **reference data, not patient data** — it stays out of FHIR and is re-derived
+  at render time. One exception: an applied institutional MRI override adds a
+  `Device.safety` coding (`mri-institutional`, local code system) at documentation time.
+- Every seeded clinical row carries `requires_verification=1` and a citation placeholder;
+  the UI shows an unverified-content strip plus a decision-support disclaimer until a
+  clinician reviews the row.
+- Contexts: `surgery` (default), `mri`, `ep_study`. Context-specific rows shadow `all` rows.
+- E2E verification: `python3 scripts/verify_protocols.py` against a running stack.
 
 **Environment Variables:**
 ```
@@ -86,6 +118,8 @@ OPENAI_MODEL            - Model ID (default: gpt-4o-mini)
 FHIR_BASE_URL           - Internal HAPI URL (http://hapi:8080/fhir)
 PUBLIC_FHIR_BASE_URL    - External HAPI URL (http://localhost:8080/fhir)
 CDS_HOOKS_URL           - CDS Hooks service URL (http://cds-hooks:5001)
+PROTOCOL_DB_PATH        - Protocol knowledge base SQLite path (default: data/protocols.db)
+OVERRIDES_PATH          - Institutional overrides JSON (default: data/institution_overrides.json)
 SECRET_KEY              - Flask session secret
 FLASK_ENV               - production | development
 ```

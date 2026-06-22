@@ -221,81 +221,103 @@ def _normalize_lookup_to_search_format(data: Dict[str, Any], query: str) -> Dict
 
 def search_devices(query: str, limit: int = 10) -> Optional[Dict[str, Any]]:
     """
-    Search for devices in GUDID.
-    
-    Handles both:
-    - Numeric queries (Device IDs): Uses lookup API, then normalizes response
-    - Text queries: Uses search API
-    
+    Search for devices by Device ID or free text.
+
+    - Numeric queries (Device IDs): AccessGUDID lookup API, normalized
+    - Text queries: openFDA UDI feed (api.fda.gov/device/udi.json) — the
+      AccessGUDID /devices/search.json endpoint was retired (404s as of
+      2026-06) so text search goes through openFDA instead
+
     Always returns consistent format with 'results' array.
-    
+
     Args:
         query: Device ID (numeric) or search text
         limit: Maximum number of results for text searches
-        
+
     Returns:
         Normalized response with 'results' array containing matching devices
     """
     try:
         # Clean the query
         query = query.strip()
-        
+
         # If the query is numeric (looks like a Device ID), use lookup
         if query.isdigit() and len(query) >= 10:
             url = f"{Config.GUDID_BASE_URL}/devices/lookup.json"
             params = {"di": query}
-            is_lookup = True
-        else:
-            url = f"{Config.GUDID_BASE_URL}/devices/search.json"
-            params = {"search": query, "pageSize": limit}
-            is_lookup = False
 
-        print(f"GUDID Search Request: {url}")
-        print(f"GUDID Search Params: {params}")
-        
-        response = requests.get(url, params=params, timeout=Config.GUDID_TIMEOUT)
-        
-        print(f"GUDID Search Response Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Debug output
-            if isinstance(data, dict):
-                print(f"GUDID Response Keys: {list(data.keys())}")
-            
-            # Normalize lookup response to match search response format
-            if is_lookup:
+            print(f"GUDID Search Request: {url}")
+            print(f"GUDID Search Params: {params}")
+
+            response = requests.get(url, params=params, timeout=Config.GUDID_TIMEOUT)
+            print(f"GUDID Search Response Status: {response.status_code}")
+
+            if response.status_code == 200:
+                data = response.json()
                 if "gudid" in data:
                     normalized = _normalize_lookup_to_search_format(data, query)
                     print(f"GUDID Normalized Results: {len(normalized.get('results', []))} device(s)")
                     return normalized
-                else:
-                    print(f"Unexpected lookup response format: {list(data.keys()) if isinstance(data, dict) else type(data)}")
-                    return {"results": [], "totalCount": 0}
-            
-            # For search responses, ensure results key exists
-            if "results" not in data:
-                # Some search responses use different structure
-                if isinstance(data, list):
-                    return {"results": data, "totalCount": len(data)}
-                print(f"No 'results' key in search response")
-                return {"results": [], "totalCount": 0}
-            
-            print(f"GUDID Search Results: {data.get('totalCount', len(data.get('results', [])))} device(s)")
-            return data
-            
-        elif response.status_code == 404:
-            print(f"Device not found in GUDID: {query}")
+                print(f"Unexpected lookup response format: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+            elif response.status_code == 404:
+                print(f"Device not found in GUDID: {query}")
+            else:
+                print(f"GUDID error: {response.status_code}")
+                print(f"Response: {response.text[:300]}")
             return {"results": [], "totalCount": 0}
-        else:
-            print(f"GUDID error: {response.status_code}")
-            print(f"Response: {response.text[:300]}")
-            return {"results": [], "totalCount": 0}
+
+        return _search_openfda_udi(query, limit)
 
     except requests.RequestException as e:
         print(f"GUDID request failed: {e}")
         return {"results": [], "totalCount": 0}
+
+
+def _search_openfda_udi(query: str, limit: int = 10) -> Dict[str, Any]:
+    """
+    Free-text device search via the openFDA UDI feed, normalized to the same
+    'results' shape the old AccessGUDID search returned.
+    """
+    url = "https://api.fda.gov/device/udi.json"
+    params = {"search": query, "limit": max(1, min(limit, 50))}
+
+    print(f"openFDA UDI Search Request: {url} params={params}")
+    response = requests.get(url, params=params, timeout=Config.GUDID_TIMEOUT)
+    print(f"openFDA UDI Search Response Status: {response.status_code}")
+
+    if response.status_code == 404:
+        # openFDA returns 404 with {"error": {"code": "NOT_FOUND"}} for no matches
+        print(f"No devices found in openFDA UDI feed: {query}")
+        return {"results": [], "totalCount": 0}
+    if response.status_code != 200:
+        print(f"openFDA error: {response.status_code}")
+        print(f"Response: {response.text[:300]}")
+        return {"results": [], "totalCount": 0}
+
+    data = response.json()
+    results = []
+    for r in data.get("results", []):
+        primary_di = next(
+            (i.get("id") for i in r.get("identifiers", []) if i.get("type") == "Primary"),
+            None,
+        )
+        if not primary_di:
+            continue
+        gmdn_terms = r.get("gmdn_terms") or []
+        results.append({
+            "primaryDi": primary_di,
+            "companyName": r.get("company_name", "") or "",
+            "brandName": r.get("brand_name", "") or "",
+            "versionModelNumber": r.get("version_or_model_number", "") or "",
+            "deviceDescription": r.get("device_description", "") or "",
+            "gmdnPTName": (gmdn_terms[0].get("name", "") if gmdn_terms else "") or "",
+            "deviceCommDistributionStatus": r.get("commercial_distribution_status", "") or "",
+            "MRISafetyStatus": r.get("mri_safety", "") or "",
+        })
+
+    total = (data.get("meta", {}).get("results", {}) or {}).get("total", len(results))
+    print(f"openFDA UDI Search Results: {len(results)} of {total} device(s)")
+    return {"results": results, "totalCount": total}
 
 
 def extract_device_info(gudid_response: Dict[str, Any]) -> Dict[str, Any]:

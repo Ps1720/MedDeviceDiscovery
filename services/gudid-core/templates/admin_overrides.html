@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeriopUDI — Institutional Overrides</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #F6F7F9; --surface: #FFFFFF; --surface-warm: #F1F4F7; --surface-cool: #E9EDF2;
+    --ink: #1B2230; --ink-2: #3A4150; --ink-3: #59616F; --ink-4: #8A93A2;
+    --rule: #E2E6EC; --rule-soft: #EDF0F4;
+    --primary: #6B3D5C; --primary-soft: #EFE6EC; --primary-deep: #4A2A40;
+    --coral: #D86A4A; --coral-soft: #FAE0D5; --coral-deep: #8E3D24;
+    --honey: #D4A04B; --honey-soft: #F7EAD0; --honey-deep: #8A6324;
+    --slate: #6E7D9C; --slate-soft: #DEE3EE; --slate-deep: #45527A;
+  }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .font-mono { font-family: 'DM Mono', monospace; }
+  .surface { background: var(--surface); border-radius: 18px; border: 1px solid var(--rule); }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+</style>
+</head>
+<body class="min-h-screen">
+
+  <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary);">
+          <div class="grid grid-cols-2 gap-0.5">
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+            <div class="w-1.5 h-1.5 rounded-sm" style="background: #E89B95;"></div>
+            <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+          </div>
+        </div>
+        <div>
+          <div class="font-semibold text-[15px]" style="color: var(--ink);">PeriopUDI</div>
+          <div class="text-[11px]" style="color: var(--ink-3);">Institutional overrides</div>
+        </div>
+      </a>
+      <a href="/" class="text-[13px] font-semibold" style="color: var(--ink-3);">← Home</a>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    <p class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4);">Admin · read-only</p>
+    <h1 class="text-[26px] font-semibold tracking-tight mt-0.5">Institutional Overrides</h1>
+    <p id="institution" class="text-[14px] mt-1" style="color: var(--ink-3);"></p>
+
+    <div class="rounded-2xl p-4 mt-5 text-[13px]" style="background: var(--honey-soft); border: 1px solid var(--honey); color: var(--honey-deep);">
+      Overrides sit on top of GUDID data and the protocol knowledge base — most importantly for MRI
+      compatibility where the internal EP device list supersedes manufacturer labeling. To change them,
+      edit <span class="font-mono font-semibold" id="file-path"></span> and reload — there is no write UI by design.
+    </div>
+
+    <div id="errors" class="hidden rounded-2xl p-4 mt-4 text-[13px]" style="background: var(--coral-soft); border: 1px solid var(--coral); color: var(--coral-deep);"></div>
+
+    <div id="list" class="mt-6 space-y-4">
+      <p class="text-[14px]" style="color: var(--ink-4);">Loading overrides…</p>
+    </div>
+  </main>
+
+  <script>
+    const esc = s => (s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+    const chip = (t, bg, fg) => `<span class="chip" style="background:${bg};color:${fg};">${esc(t)}</span>`;
+
+    function matchChips(match) {
+      const out = [];
+      if (match.udi_di) out.push(chip('UDI-DI ' + match.udi_di, 'var(--primary-soft)', 'var(--primary-deep)'));
+      if (match.manufacturer) out.push(chip('Manufacturer ~ ' + match.manufacturer, 'var(--slate-soft)', 'var(--slate-deep)'));
+      if (match.brand) out.push(chip('Brand ~ ' + match.brand, 'var(--slate-soft)', 'var(--slate-deep)'));
+      if (match.model) out.push(chip('Model ~ ' + match.model, 'var(--slate-soft)', 'var(--slate-deep)'));
+      if (match.gmdn_code) out.push(chip('GMDN ' + match.gmdn_code, 'var(--slate-soft)', 'var(--slate-deep)'));
+      if (match.device_class) out.push(chip('Class: ' + match.device_class, 'var(--surface-cool)', 'var(--ink-3)'));
+      return out.join(' ');
+    }
+
+    function overrideCard(o) {
+      const fields = Object.entries(o.fields || {}).map(([k, f]) => `
+        <div class="rounded-xl p-3 mt-2" style="background: var(--surface-warm); border: 1px solid var(--rule);">
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4);">${esc(k)}</span>
+            ${f.severity ? chip(f.severity, f.severity === 'critical' ? 'var(--coral)' : 'var(--honey)', '#fff') : ''}
+          </div>
+          <p class="text-[13px] font-medium mt-1">${esc(f.value || '')}</p>
+          ${f.detail ? `<p class="text-[12px] mt-1" style="color: var(--ink-3);">${esc(f.detail)}</p>` : ''}
+        </div>`).join('');
+      return `
+        <div class="surface p-5">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="font-mono text-[12px]" style="color: var(--ink-4);">${esc(o.id || '(no id)')}</span>
+            ${o.supersedes_manufacturer_labeling
+              ? chip('Supersedes manufacturer labeling', 'var(--honey)', '#fff')
+              : chip('Annotation', 'var(--surface-cool)', 'var(--ink-3)')}
+          </div>
+          <div class="flex flex-wrap gap-1.5 mt-3">${matchChips(o.match || {})}</div>
+          ${fields}
+          ${o.annotation ? `<p class="text-[13px] mt-3" style="color: var(--ink-2);">${esc(o.annotation)}</p>` : ''}
+          <p class="text-[11px] mt-2" style="color: var(--ink-4);">
+            ${esc(o.author || 'Unknown author')}${o.effective_date ? ' · effective ' + esc(o.effective_date) : ''}
+          </p>
+        </div>`;
+    }
+
+    async function load() {
+      const list = document.getElementById('list');
+      try {
+        const res = await fetch('/api/admin/overrides');
+        const data = await res.json();
+        document.getElementById('institution').textContent = data.institution || '';
+        document.getElementById('file-path').textContent = data.file || 'data/institution_overrides.json';
+        if (data.errors && data.errors.length) {
+          const errBox = document.getElementById('errors');
+          errBox.innerHTML = '<strong>Parse problems:</strong><ul class="list-disc ml-5 mt-1">' +
+            data.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul>';
+          errBox.classList.remove('hidden');
+        }
+        const overrides = data.overrides || [];
+        list.innerHTML = overrides.length
+          ? overrides.map(overrideCard).join('')
+          : `<div class="surface p-8 text-center text-[14px]" style="color: var(--ink-4);">No overrides defined.</div>`;
+      } catch (e) {
+        list.innerHTML = `<div class="rounded-2xl p-4" style="background: var(--coral-soft); color: var(--coral-deep);">Could not load overrides: ${esc(e.message)}</div>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

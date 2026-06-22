@@ -6,6 +6,194 @@ All notable changes to the PeriopUDI project are documented in this file. This c
 
 ## [Unreleased]
 
+---
+
+### Current Status — 2026-06-22
+
+**Where we are:** The full GUDID + Google Custom Search → IFU PDF → LLM extraction
+pipeline is built and integrated end-to-end. Both API credentials (`GOOGLE_API_KEY`,
+`GOOGLE_CSE_ID`) are configured in `.env`. The pipeline has not yet been run against
+live devices — the next step is an end-to-end smoke test using the verified demo DIs.
+
+**What's wired up:**
+- GUDID DI lookup (v3 + v2) → Google Custom Search fallback → PDF download → magnet/MRI
+  fact extraction via LLM → GUDID cross-validation → `brand_facts` storage
+- Google Custom Search keys set in `.env` (free tier: 100 queries/day)
+- All extracted facts remain `requires_verification=1` until a clinician runs `--verify`
+
+**Immediate next steps:**
+1. Run `python ifu_pipeline.py --di 00643169634589 --manufacturer Medtronic --brand "Azure XT DR" --model W1DR01 --verbose` end-to-end
+2. Confirm Google CSE returns a valid Medtronic IFU PDF
+3. Verify the LLM extracts `magnet_rate_bpm`, `magnet_mode`, and `mri_conditional` correctly
+4. Clinician review and sign-off (`--verify <id> --by "Dr. ..."`) before any protocol display
+
+---
+
+### Added — IFU Pipeline: Automated Brand-Specific Fact Extraction (2026-06-22)
+
+Closes the gap where magnet behavior and other brand-specific clinical facts were
+generic class-level text ("varies by manufacturer — see brand info") with no actual
+brand data behind them. The pipeline finds the device's Instructions for Use PDF,
+extracts structured clinical facts via LLM, cross-validates them against GUDID, and
+stores them in the `brand_facts` table with full provenance tracking.
+
+**Files added (`services/gudid-core/`):**
+
+- **`ifu_finder.py`** — IFU URL discovery in priority order:
+  (1) AccessGUDID v3 labeling endpoint, (2) AccessGUDID v2 device endpoint,
+  (3) **Google Custom Search JSON API** (requires `GOOGLE_API_KEY` + `GOOGLE_CSE_ID`
+  env vars — both are set in `.env`; query: `"{Manufacturer} {Brand} {Model} physician
+  manual IFU filetype:pdf"`; returns first PDF link from results),
+  (4) hint-only fallback that returns a Google search URL for manual follow-up.
+
+- **`ifu_extractor.py`** — Downloads the PDF, extracts text from clinically relevant
+  pages (magnet, MRI, electrocautery, support sections) via `pdfplumber`, then calls
+  the configured LLM to return a structured JSON of clinical facts:
+  `magnet_rate_bpm`, `magnet_mode`, `magnet_response_programmable_off`,
+  `magnet_inhibits_tachy_therapy`, `mri_conditional`, `mri_conditions_summary`,
+  `support_phone_24hr`, `electrocautery_recommendation`, `em_interference_notes`.
+
+- **`ifu_validator.py`** — Cross-validates extracted facts against the GUDID record:
+  MRI safety status consistency (GUDID `MRISafetyStatus` vs extracted `mri_conditional`),
+  manufacturer name match (catches wrong-manual fetches), magnet rate plausibility check.
+  Returns a `confidence` score (0–1) and `conflicts` list; any conflict blocks facts
+  from serving without a VERIFY banner and flags the record for clinician review.
+
+- **`ifu_store.py`** — Writes pipeline results to two DB tables. `ifu_records` stores
+  one row per (device, IFU URL): `ifu_url`, `ifu_hash`, `last_fetched`, `extracted_at`,
+  `conflict_flags`, `status` (pending/extracted/conflict/verified). `brand_facts` rows
+  are written with `source='llm'`, `source_url`, `extracted_at`, and `ifu_record_id`
+  so every fact is traceable to its source document. `mark_verified(id, by)` clears
+  `requires_verification` on all facts for a record once a clinician signs off.
+
+- **`ifu_pipeline.py`** — Orchestrator + CLI. Ties all four steps together in sequence.
+  Re-hash detection: if the PDF hash matches the stored `ifu_hash`, extraction is skipped
+  and the existing facts remain valid. CLI usage:
+  ```
+  # Run pipeline for a device
+  python ifu_pipeline.py --di 00643169634589 --manufacturer Medtronic \
+                         --brand "Azure XT DR" --model W1DR01
+
+  # Provide PDF URL directly (skip finder)
+  python ifu_pipeline.py --manufacturer Medtronic --brand "Azure XT" \
+                         --url https://example.com/azure_ifu.pdf
+
+  # List all IFU records with status
+  python ifu_pipeline.py --list
+
+  # Mark record 3 as clinician-verified
+  python ifu_pipeline.py --verify 3 --by "Dr. Smith"
+  ```
+
+**`protocol_db.py` changes:**
+- New `ifu_records` table in schema (tracked above).
+- `brand_facts` extended with: `source`, `source_url`, `extracted_at`, `ifu_record_id`.
+- `_run_migrations()` handles backward-compatible column additions for existing DBs.
+- New functions: `upsert_ifu_record()`, `get_ifu_record()`, `list_ifu_records()`.
+
+**`requirements.txt`:** added `pdfplumber==0.11.4`.
+
+**Design notes:**
+- All LLM-extracted facts carry `requires_verification=1` and show the VERIFY banner
+  until a clinician runs `mark_verified()`. This is non-negotiable for clinical safety.
+- If GUDID returns a labeling URL, no web search API key is needed. `GOOGLE_API_KEY`
+  and `GOOGLE_CSE_ID` are only used as a fallback for devices without GUDID labeling
+  links. Free tier covers 100 queries/day — well within budget for a per-model-ever
+  caching strategy.
+- The pipeline degrades gracefully at each step: no PDF URL → record saved with status
+  `pending`; PDF unparseable → `no_facts`; LLM fails → `no_facts`; validation conflict
+  → `conflict` (facts saved but not auto-written to `brand_facts`).
+
+### Added — 3D Heart Visual + Clinician-Captured Implant Location (2026-06-11)
+
+A "Visual" tab on the patient-chart protocol view for cardiac rhythm devices: an
+interactive Three.js 3D heart with the device drawn at its implant location and an
+interactive magnet simulation. Implant location is now real patient data.
+
+- **Implant location data model** — `services/gudid-core/implant_sites.py` (pure module):
+  per-class lead configs (pacemaker ra_rv/rv_only/ra_only; CRT ra_rv_lv; ICD rv_only/
+  ra_rv/subcutaneous S-ICD; leadless leadless_rv) + pocket side. Stored on the FHIR
+  Device as a complex extension (`…/StructureDefinition/implant-site`) with SNOMED-coded
+  body sites (codes flagged VERIFY; uncoded sites emit text-only CodeableConcepts).
+  **Extension present = clinician-confirmed; absent = "typical placement" rendering.**
+- **Capture at scan time** — scan-to-chart form pre-resolves the UDI (debounced lookup)
+  and reveals an "Implant location" selector for cardiac rhythm devices; the choice rides
+  the existing POST and is written with the Device (with a retry-without-extension safety
+  net if HAPI rejects it). `protocol` blocks for cardiac classes now carry
+  `implant_options`.
+- **Set location later** — `PUT /api/device/<id>/implant-site` (new HapiClient
+  `get_device`/`update_device`) lets clinicians confirm location on devices documented
+  before this feature; available inline in the Visual tab.
+- **Visual tab** — timeline overlay gains Protocol | Visual tabs (Visual only for
+  cardiac rhythm devices). `static/heart_visual.js`: procedurally built stylized 3D
+  heart (Three.js r128 via CDN, lazy-loaded; license-clean, no downloaded mesh),
+  translucent chambers with RA/RV/LA/LV labels, device can + leads routed to the stored
+  (or typical) location, leadless capsule and S-ICD variants, beating animation synced
+  to an ECG-style strip, orbit/zoom controls, WebGL-absent fallback message.
+- **Magnet simulation** — "Apply magnet" animates a magnet onto the can; behavior driven
+  by the protocol knowledge base: pacemaker/CRT-P → asynchronous pacing at the brand
+  magnet rate (e.g. Medtronic 85 bpm, VERIFY) with pacing-spike ECG + pulse rings at lead
+  tips; ICD/CRT-D → "TACHY THERAPY SUSPENDED — PACING UNCHANGED" badge; leadless → "NO
+  MAGNET RESPONSE — REPROGRAMMING REQUIRED". Missing rate facts fall back to a generic
+  90 bpm explicitly labeled illustrative. CRT-P magnet-rate brand facts added to the seed
+  (SEED_VERSION 2026.06.2).
+- **Honest labeling** — "Location confirmed by clinician" vs "Typical placement — not
+  confirmed" badge; magnet-rate verification status surfaced; standing "Stylized anatomy —
+  illustrative, not a clinical image" + protocol disclaimer.
+- **Tests** — 65 passing (new: test_implant_sites.py, test_implant_write.py, implant
+  options + CRT-P rate coverage). Headless-Chrome screenshot harness at
+  `static/hv_test.html` (dev fixture) validated all four scene variants.
+
+### Added — Perioperative Protocol Layer (2026-06-10)
+
+Implements all five features from Suggestions.md on a shared foundation: a UDI scan now
+returns actionable perioperative guidance ("what do I do right now"), not just a data sheet.
+
+- **Protocol knowledge base (SQLite)** — `services/gudid-core/protocol_db.py` +
+  `protocol_seed.py`. Version-gated startup seeding (recall-cache pattern); DB at
+  `data/protocols.db` (`PROTOCOL_DB_PATH`). 11 device classes across three modules:
+  cardiac rhythm (pacemaker, leadless, ICD, CRT-P, CRT-D), neuromodulation (VNS, DBS, SCS),
+  diabetes (insulin pump, CGM, closed-loop AID).
+- **Device-class resolver** — `device_class_resolver.py`. Precedence: brand/model rules
+  (only way to detect closed-loop AID) > FDA product code > GMDN code > GMDN-name keyword >
+  free-text fallback, with confidence grading. Works on GUDID records and FHIR-lite dicts.
+- **Cardiac rhythm protocols** — magnet behavior (pacemaker async vs ICD therapy-suspension,
+  leadless no-magnet-response), electrocautery precautions, pacer-dependence note, NBG code
+  semantics, per-manufacturer magnet rates and 24-hr CRM support lines (HRS/ASA citations).
+- **Guideline-backed checklists** — ordered per class per context with per-item citations,
+  rendered with checkboxes at scan time.
+- **Institutional override layer** — `overrides.py` + admin-editable
+  `data/institution_overrides.json` (volume-mounted, no rebuild). Match by UDI-DI >
+  manufacturer/brand > GMDN > device class; merge precedence override > brand fact > class
+  protocol > raw GUDID, with per-field provenance. Read-only admin page at `/admin/overrides`.
+  When an MRI override applies at scan time, an extra `Device.safety` coding
+  (`mri-institutional`) is written to the FHIR Device.
+- **Context scoping** — every protocol is scoped to surgery / MRI / EP-study; context
+  selector in the UI, `?context=` on the API.
+- **API** — `protocol` block in `POST /scan-to-chart` and `POST /api/lookup/udi`
+  (which now also accepts bare numeric DIs); new `GET /api/protocol/by-di/<di>?context=`,
+  `GET /admin/overrides`, `GET /api/admin/overrides`. Timeline devices carry
+  `protocol_class`/`protocol_available` hints (resolver on FHIR fields only — no GUDID
+  calls on chart load; full protocol lazy-loads on card expand via a 15-min TTL cache).
+- **UI** — protocol panel in the scan result (`scan_to_chart.html`, now on the timeline
+  theme) and as an expander on timeline device cards, both via shared
+  `static/protocol_card.js`; provenance badges (Institution/Brand/Guideline/GUDID),
+  severity-coded headline actions, `tel:` support lines, `diabetes` category color.
+- **Tests & verification** — 27 pytest units in `services/gudid-core/tests/`;
+  `scripts/verify_protocols.py` e2e against a running stack (all green 2026-06-10 with
+  live-GUDID-confirmed DIs: Azure XT DR `00643169634589`, Percept PC `00763000519216`,
+  SenTiva `05425025750405`, t:slim X2 Control-IQ `00389152000107`, MiniMed 780G
+  `00199150047048`, Dexcom G7 `00386270003584`).
+
+**Clinical content status:** every seeded fact/checklist row carries
+`requires_verification=1` with citation placeholders; the UI shows an "unverified content"
+strip and a persistent decision-support disclaimer. Phone numbers, magnet rates, FDA product
+codes, and guideline citations MUST be clinician-verified before demo/pilot use.
+
+**Known fixture note:** `00643169001763` is the Medtronic MOSAIC valve in live GUDID — the
+`fhir-bridge` test fixture labeling it "Azure XT DR" is a mislabel (the cds-hooks comment is
+correct).
+
 ### In Progress (Phase 6–8)
 
 - [ ] **Phase 6: SMART App Launch v2** — EHR integration with OAuth2, patient context
@@ -307,6 +495,7 @@ Timeline: add recall banner and device RECALL badges
 ## Recent Commit History (Last 20)
 
 ```
+9cbd31b version 2 (protocol layer, 3D heart visual, IFU pipeline)
 36e07c9 Home: replace narrative hero with tool-focused headline
 5705dbf Home: editorial redesign (Fraunces hero, scanner mock, how-it-works, stats)
 96d1818 Home: give the three workflow cards distinct pale colors
@@ -324,7 +513,6 @@ ff24443 Patients page: full-width Material-style data table + enriched demograph
 fe2d693 Phase 5: CDS Hooks recall surveillance + timeline recall badges
 ff82417 Fix parse_udi (top-level di) and wire UDI production identifiers into Device
 ab0492d Phase 3: scan-to-chart workflow (UDI -> US Core Device in HAPI + timeline)
-016353d Fix: move gudid-core to host port 8090 (macOS AirPlay holds 5000)
 bcbb6eb Phase 2: GUDID -> US Core v8.0.1 Implantable Device mapper + HAPI client
 f056d3a Phase 1: local FHIR foundation (HAPI R4 + US Core v8.0.1 + Synthea seed)
 ```
@@ -432,5 +620,5 @@ To add to this changelog, follow the format:
 
 ---
 
-*Last updated: 2026-06-04*  
-*Phases 0–5 complete. Phase 6 starting. Target submission: July 2026, presentation: November 10, 2026.*
+*Last updated: 2026-06-22*  
+*Phases 0–5 complete. Periop protocol layer, 3D heart visual, and IFU pipeline (GUDID + Google Custom Search) built. Google API keys configured. Next: end-to-end pipeline smoke test, then Phase 6 (SMART launch). Target submission: July 2026, presentation: November 10, 2026.*

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg:#F6F7F9; --surface:#fff; --surface-warm:#F1F4F7; --surface-cool:#E9EDF2;
+    --ink:#1B2230; --ink-2:#3A4150; --ink-3:#59616F; --ink-4:#8A93A2;
+    --rule:#E2E6EC; --rule-soft:#EDF0F4; --primary:#6B3D5C; --primary-soft:#EFE6EC;
+    --coral:#D86A4A; --coral-soft:#FAE0D5; --coral-deep:#8E3D24;
+    --honey:#D4A04B; --honey-soft:#F7EAD0; --honey-deep:#8A6324;
+    --slate-soft:#DEE3EE; --slate-deep:#45527A; --emerald-soft:#E2EFE9; --emerald-deep:#2E6A55;
+  }
+  body { font-family: sans-serif; margin: 24px; background: var(--bg); }
+  .grid { display: grid; } .hidden { display: none; }
+  .lg\:grid-cols-\[1fr_300px\] { grid-template-columns: 1fr 300px; } .gap-8 { gap: 2rem; }
+  #out { padding: 8px; font: 12px monospace; white-space: pre; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<div id="stage" style="max-width:1200px;"></div>
+<script>
+  window.__errors = [];
+  window.onerror = function (msg, src, line) { window.__errors.push(msg + ' @' + line); };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="http://localhost:8099/static/heart_visual.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const cls = params.get('cls') || 'pacemaker';
+  const CONFIGS = {
+    pacemaker: { cfg: 'ra_rv', label: 'Dual chamber (RA + RV)' },
+    leadless_pacemaker: { cfg: 'leadless_rv', label: 'Leadless capsule (RV)', no_pocket: true },
+    icd: { cfg: 'subcutaneous', label: 'Subcutaneous (S-ICD)' },
+    crt_d: { cfg: 'ra_rv_lv', label: 'Biventricular (RA + RV + LV via CS)' },
+  };
+  const chosen = CONFIGS[cls];
+  const protocol = {
+    device_class: cls,
+    class_display: 'Implantable pacemaker',
+    module: 'cardiac_rhythm',
+    disclaimer: 'Decision support only.',
+    facts: {
+      magnet_rate: { value: '85 bpm', requires_verification: true, source: 'brand_fact' },
+      magnet_behavior: { value: 'Magnet application switches most transvenous pacemakers to asynchronous pacing.' },
+    },
+    implant_options: {
+      lead_configs: [
+        { code: chosen.cfg, label: chosen.label, default: true, no_pocket: !!chosen.no_pocket },
+      ],
+      pocket_sides: [{ code: 'left', label: 'Left pectoral', default: true }, { code: 'right', label: 'Right pectoral', default: false }],
+      default_lead_config: chosen.cfg,
+      has_pocket: true,
+    },
+  };
+  const out = document.getElementById('out');
+  try {
+    const handle = initHeartVisual(document.getElementById('stage'), {
+      protocol,
+      implant: null,
+      deviceName: 'Azure XT DR MRI SureScan',
+      manufacturer: 'Medtronic, Inc.',
+      fhirId: '9001',
+    });
+    // simulate a magnet click after the scene starts
+    setTimeout(() => {
+      const btn = document.querySelector('[data-hv="magnet-btn"]');
+      if (btn) btn.click();
+    }, 800);
+    setTimeout(() => {
+      const badge = document.querySelector('[data-hv="badge"]');
+      const status = document.querySelector('[data-hv="status"]');
+      const locBadge = document.querySelector('[data-hv="loc-badge"]');
+      out.textContent = [
+        'ERRORS: ' + (window.__errors.length ? window.__errors.join(' | ') : 'none'),
+        'CANVAS: ' + (document.querySelector('canvas') ? 'present' : 'MISSING'),
+        'BADGE: ' + (badge ? (badge.classList.contains('hidden') ? '(hidden)' : badge.textContent) : 'MISSING'),
+        'STATUS: ' + (status ? status.textContent.trim() : 'MISSING'),
+        'LOC: ' + (locBadge ? locBadge.textContent.trim().slice(0, 80) : 'MISSING'),
+        'DONE',
+      ].join('\n');
+      document.title = 'HV_TEST_DONE';
+    }, 2600);
+  } catch (e) {
+    out.textContent = 'INIT THREW: ' + e.message + '\n' + e.stack;
+  }
+</script>
+</body>
+</html>

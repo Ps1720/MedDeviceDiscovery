@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "institution": "Demo Institution — edit services/gudid-core/data/institution_overrides.json (volume-mounted; no rebuild needed)",
+  "overrides": [
+    {
+      "id": "ovr-mri-demo-pacemaker-001",
+      "match": { "udi_di": "00643169634589" },
+      "fields": {
+        "mri": {
+          "value": "MR Conditional per institutional EP device list",
+          "detail": "DEMO OVERRIDE: internal EP list permits 1.5T scanning under EP supervision despite ambiguous manufacturer labeling. Contact the EP service before scheduling.",
+          "severity": "caution"
+        }
+      },
+      "annotation": "Institutional EP device list supersedes manufacturer labeling for this model family.",
+      "effective_date": "2026-06-01",
+      "author": "EP Service / CMIO office (demo)",
+      "supersedes_manufacturer_labeling": true
+    },
+    {
+      "id": "ovr-cgm-electrocautery-001",
+      "match": { "device_class": "cgm" },
+      "fields": {
+        "cgm_interference": {
+          "value": "Institutional policy: confirm all intra-op glucose values by blood sample; CGM display values are not to be charted intra-op.",
+          "detail": "DEMO OVERRIDE: Anesthesia QI policy on CGM use during electrocautery cases.",
+          "severity": "critical"
+        }
+      },
+      "annotation": "Anesthesia QI policy on intraoperative CGM reliance.",
+      "effective_date": "2026-06-01",
+      "author": "Anesthesia QI (demo)",
+      "supersedes_manufacturer_labeling": false
+    }
+  ]
+}

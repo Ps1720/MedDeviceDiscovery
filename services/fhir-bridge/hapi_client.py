@@ -45,6 +45,20 @@ class HapiClient:
         self._raise_for_status(resp, "create Device")
         return resp.json()["id"]
 
+    def update_device(self, device_resource: dict) -> dict:
+        """Update an existing Device (requires resource['id']); returns the stored resource."""
+        device_id = device_resource.get("id")
+        if not device_id:
+            raise FhirError("update_device requires resource['id']", status=0)
+        resp = self.session.put(
+            f"{self.base_url}/Device/{device_id}",
+            json=device_resource,
+            headers={"Content-Type": _JSON},
+            timeout=self.timeout,
+        )
+        self._raise_for_status(resp, "update Device")
+        return resp.json()
+
     def link_to_procedure(self, device_id: str, procedure_id: str) -> None:
         """Add the Device to Procedure.focalDevice via a JSON Patch."""
         patch = [
@@ -63,6 +77,15 @@ class HapiClient:
         self._raise_for_status(resp, "link Device to Procedure")
 
     # ---- reads ----
+
+    def get_device(self, device_id: str) -> dict:
+        """Fetch a single Device resource by logical id."""
+        resp = self.session.get(
+            f"{self.base_url}/Device/{device_id}",
+            timeout=self.timeout,
+        )
+        self._raise_for_status(resp, "read Device")
+        return resp.json()
 
     def get_patient_devices(self, patient_id: str) -> list[dict]:
         """Return all Device resources whose patient is Patient/<patient_id>."""

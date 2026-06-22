@@ -96,7 +96,7 @@
         <div class="text-right">
           <div class="flex items-center gap-2 justify-end">
             <button id="edit-btn" class="btn-edit">Edit</button>
-            <a href="/scan-to-chart" class="btn-open">+ Document device</a>
+            <a href="/scan-to-chart?patient_id={{ patient_id }}" class="btn-open">+ Document device</a>
           </div>
           <p id="device-count" class="text-[12px] mt-2" style="color: var(--ink-4);"></p>
         </div>
@@ -112,6 +112,35 @@
     </div>
   </main>
 
+  <!-- Full-page perioperative protocol view -->
+  <div id="protocol-overlay" class="hidden fixed inset-0 z-50 overflow-y-auto" style="background: var(--bg);">
+    <header class="sticky top-0 z-10" style="background: rgba(246,247,249,0.92); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
+      <div class="w-full px-6 sm:px-10 py-4 flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4);">Perioperative protocol</p>
+          <h2 id="protocol-overlay-title" class="text-[20px] font-semibold tracking-tight truncate" style="color: var(--ink);"></h2>
+        </div>
+        <div class="flex items-center gap-5 shrink-0">
+          <div id="overlay-tabs" class="hidden items-center gap-5">
+            <button data-tab="protocol" class="ov-tab pb-1 text-[13px] font-semibold transition">Protocol</button>
+            <button data-tab="visual" class="ov-tab pb-1 text-[13px] font-semibold transition">Visual</button>
+          </div>
+          <button id="protocol-overlay-close" title="Back to all devices (Esc)"
+                  class="w-10 h-10 rounded-full flex items-center justify-center text-[20px] leading-none transition"
+                  style="background: var(--surface); border: 1px solid var(--rule); color: var(--ink-2);"
+                  onmouseover="this.style.borderColor='var(--ink-4)'" onmouseout="this.style.borderColor='var(--rule)'">
+            &times;
+          </button>
+        </div>
+      </div>
+    </header>
+    <div class="w-full px-6 sm:px-10 py-8">
+      <div id="protocol-overlay-body" class="surface p-6 sm:p-10"></div>
+      <div id="visual-overlay-body" class="surface p-6 sm:p-10 hidden"></div>
+    </div>
+  </div>
+
+  <script src="/static/protocol_card.js"></script>
   <script>
     const esc = s => (s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
     const patientId = {{ patient_id | tojson }};
@@ -125,6 +154,7 @@
     // Category color coordination (distinct but harmonized with the cool theme)
     const CATEGORY = {
       cardiac:    { bar: '#C2536A', bg: '#F7E4E8', fg: '#9B2F47', label: 'Cardiac' },
+      diabetes:   { bar: '#6B8C3A', bg: '#E6F0DC', fg: '#4A6B24', label: 'Diabetes' },
       neuro:      { bar: '#7C5BC2', bg: '#ECE6F7', fg: '#553B91', label: 'Neuro' },
       ortho:      { bar: '#C98A3A', bg: '#F7EAD0', fg: '#8A6324', label: 'Orthopedic' },
       vascular:   { bar: '#2E8B82', bg: '#DCEFEC', fg: '#1F6157', label: 'Vascular' },
@@ -132,11 +162,12 @@
       general:    { bar: '#6E7D9C', bg: '#DEE3EE', fg: '#45527A', label: 'General' },
     };
     const SAFETY = {
-      'mri':        { bg: 'var(--slate-soft)',   fg: 'var(--slate-deep)' },
-      'latex':      { bg: 'var(--coral-soft)',   fg: 'var(--coral-deep)' },
-      'no-latex':   { bg: 'var(--emerald-soft)', fg: 'var(--emerald-deep)' },
-      'single-use': { bg: 'var(--surface-cool)', fg: 'var(--ink-3)' },
-      'sterile':    { bg: 'var(--sky-soft)',     fg: 'var(--sky-deep)' },
+      'mri':               { bg: 'var(--slate-soft)',   fg: 'var(--slate-deep)' },
+      'mri-institutional': { bg: 'var(--honey-soft)',   fg: 'var(--honey-deep)' },
+      'latex':             { bg: 'var(--coral-soft)',   fg: 'var(--coral-deep)' },
+      'no-latex':          { bg: 'var(--emerald-soft)', fg: 'var(--emerald-deep)' },
+      'single-use':        { bg: 'var(--surface-cool)', fg: 'var(--ink-3)' },
+      'sterile':           { bg: 'var(--sky-soft)',     fg: 'var(--sky-deep)' },
     };
 
     function renderPatient(p) {
@@ -216,6 +247,12 @@
           </dl>
           ${safety ? `<div class="flex flex-wrap gap-1 mt-3">${safety}</div>` : ''}
           ${recallDetail}
+          ${d.protocol_available ? `
+          <button class="chip mt-3 self-start cursor-pointer"
+                  style="background:var(--primary-soft);color:var(--primary-deep);border:1px solid var(--primary);"
+                  onclick="openProtocol('${esc(d.id)}')">
+            Periop protocol →
+          </button>` : ''}
           <div class="text-[11px] mt-auto pt-3" style="color:var(--ink-4);">
             <a class="hover:underline" style="color:var(--primary);" href="${esc(d.fhir_url)}" target="_blank">FHIR Device/${esc(d.id)}</a>
             · ${esc((d.last_updated || '').split('T')[0])}
@@ -223,6 +260,121 @@
         </div>
       </div>`;
     }
+
+    // ---- Full-page protocol view (Protocol | Visual tabs) ----
+    const protocolOverlay = document.getElementById('protocol-overlay');
+    const protocolBody = document.getElementById('protocol-overlay-body');
+    const visualBody = document.getElementById('visual-overlay-body');
+    const protocolTitle = document.getElementById('protocol-overlay-title');
+    const overlayTabs = document.getElementById('overlay-tabs');
+
+    const devicesById = {};            // populated by load()
+    let currentEntry = null;           // device entry for the open overlay
+    let currentProtocol = null;        // protocol block for the open overlay
+    let currentProtocolPromise = null; // resolves to the protocol block (or null)
+    let visualHandle = null;           // {dispose} from initHeartVisual
+    let visualLoaded = false;          // scripts injected once per page
+
+    function setTab(tab) {
+      protocolBody.classList.toggle('hidden', tab !== 'protocol');
+      visualBody.classList.toggle('hidden', tab !== 'visual');
+      overlayTabs.querySelectorAll('.ov-tab').forEach(b => {
+        const active = b.dataset.tab === tab;
+        b.style.color = active ? 'var(--ink)' : 'var(--ink-4)';
+        b.style.borderBottom = `2px solid ${active ? 'var(--primary)' : 'transparent'}`;
+      });
+      if (tab === 'visual') activateVisual();
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('failed to load ' + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function activateVisual() {
+      if (!currentEntry || visualHandle) return;
+      const entry = currentEntry;
+      visualBody.innerHTML = `<p class="text-[14px]" style="color:var(--ink-4);">Loading 3D view…</p>`;
+      try {
+        const protocol = currentProtocol ||
+          (currentProtocolPromise ? await currentProtocolPromise : null);
+        if (entry !== currentEntry || visualHandle) return; // overlay changed meanwhile
+        if (!visualLoaded) {
+          await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');
+          await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+          await loadScript('/static/heart_visual.js');
+          visualLoaded = true;
+        }
+        if (entry !== currentEntry || visualHandle) return;
+        visualBody.innerHTML = '';
+        visualHandle = initHeartVisual(visualBody, {
+          protocol: protocol,
+          implant: entry.implant,
+          deviceName: entry.name,
+          manufacturer: entry.manufacturer,
+          fhirId: entry.id,
+          onLocationSaved: (implant) => { entry.implant = implant; },
+        });
+      } catch (e) {
+        visualBody.innerHTML = `<p class="text-[14px]" style="color:var(--coral-deep);">Could not load 3D view: ${esc(e.message)}</p>`;
+      }
+    }
+
+    async function openProtocol(deviceId) {
+      const entry = devicesById[deviceId];
+      if (!entry) return;
+      currentEntry = entry;
+      currentProtocol = null;
+      protocolTitle.textContent = entry.name || 'Device protocol';
+      protocolBody.innerHTML = `<p class="text-[14px]" style="color:var(--ink-4);">Loading protocol…</p>`;
+      const showVisualTab = entry.protocol_module === 'cardiac_rhythm';
+      overlayTabs.classList.toggle('hidden', !showVisualTab);
+      overlayTabs.classList.toggle('flex', showVisualTab);
+      setTab('protocol');
+      protocolOverlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      currentProtocolPromise = (async () => {
+        try {
+          const res = await fetch(`/api/protocol/by-di/${encodeURIComponent(entry.device_identifier)}?context=surgery`);
+          const data = await res.json();
+          if (data.found && data.protocol) {
+            currentProtocol = data.protocol;
+            if (currentEntry === entry) {
+              renderProtocolPanel(protocolBody, data.protocol, entry.device_identifier);
+            }
+            return data.protocol;
+          }
+          protocolBody.innerHTML = `<p class="text-[14px]" style="color:var(--ink-4);">No protocol available for this device${data.error ? ': ' + esc(data.error) : ' (GUDID record not reachable)'}.</p>`;
+        } catch (e) {
+          protocolBody.innerHTML = `<p class="text-[14px]" style="color:var(--coral-deep);">Could not load protocol: ${esc(e.message)}</p>`;
+        }
+        return null;
+      })();
+      await currentProtocolPromise;
+    }
+
+    function closeProtocol() {
+      if (visualHandle) { visualHandle.dispose(); visualHandle = null; }
+      protocolOverlay.classList.add('hidden');
+      protocolBody.innerHTML = '';
+      visualBody.innerHTML = '';
+      currentEntry = null;
+      currentProtocol = null;
+      currentProtocolPromise = null;
+      document.body.style.overflow = '';
+    }
+
+    overlayTabs.querySelectorAll('.ov-tab').forEach(b =>
+      b.addEventListener('click', () => setTab(b.dataset.tab)));
+    document.getElementById('protocol-overlay-close').addEventListener('click', closeProtocol);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !protocolOverlay.classList.contains('hidden')) closeProtocol();
+    });
 
     async function load() {
       try {
@@ -238,11 +390,12 @@
           grid.className = '';
           grid.innerHTML = `<div class="surface p-8 text-center text-[14px]" style="color:var(--ink-4);">
             No devices documented yet.
-            <div class="mt-3"><a style="color:var(--primary);font-weight:600;" href="/scan-to-chart">Document one now →</a></div>
+            <div class="mt-3"><a style="color:var(--primary);font-weight:600;" href="/scan-to-chart?patient_id=${encodeURIComponent(patientId)}">Document one now →</a></div>
           </div>`;
           return;
         }
         grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
+        devices.forEach(d => { devicesById[d.id] = d; });
         grid.innerHTML = devices.map(deviceCard).join('');
       } catch (e) {
         grid.className = '';
