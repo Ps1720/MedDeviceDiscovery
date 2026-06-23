@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +25,9 @@ from gudid_service import parse_udi, get_device_from_gudid
 from gudid_to_uscore_device import map_to_device, US_CORE_IMPLANTABLE_DEVICE
 from hapi_client import HapiClient, FhirError
 import implant_sites
+import protocol_db
 import protocol_service
+import ifu_pipeline
 from device_class_resolver import resolve_device_class
 
 DEVICE_SAFETY_SYSTEM = "https://periop-udi.local/fhir/CodeSystem/device-safety"
@@ -50,6 +53,41 @@ _SCAN_LOG_FIELDS = [
 
 def _client() -> HapiClient:
     return HapiClient(FHIR_BASE_URL)
+
+
+def _ifu_already_attempted(manufacturer: str, brand: str) -> bool:
+    """True if we already have a non-pending IFU record for this manufacturer+brand."""
+    try:
+        protocol_db.init_db()
+        records = protocol_db.list_ifu_records()
+        mfr = (manufacturer or "").lower()
+        br = (brand or "").lower()
+        done_statuses = {"extracted", "verified", "conflict", "no_facts"}
+        for r in records:
+            if (
+                (r.get("manufacturer") or "").lower() == mfr
+                and (r.get("brand") or "").lower() == br
+                and r.get("status") in done_statuses
+            ):
+                return True
+    except Exception as exc:
+        print(f"[ifu-pipeline] could not check existing records: {exc}")
+    return False
+
+
+def _run_ifu_background(di: Optional[str], manufacturer: str, brand: str, model: str) -> None:
+    """Target for the background IFU pipeline thread."""
+    try:
+        result = ifu_pipeline.run_pipeline(
+            di=di,
+            manufacturer=manufacturer,
+            brand=brand,
+            model=model,
+            verbose=False,
+        )
+        print(f"[ifu-pipeline] {manufacturer} / {brand}: {result.get('summary', 'done')}")
+    except Exception as exc:
+        print(f"[ifu-pipeline] background run failed for {manufacturer}/{brand}: {exc}")
 
 
 def _resolve_di(udi: str) -> tuple[str, Optional[str], Optional[str], dict]:
@@ -178,18 +216,38 @@ def document_device(
             client.link_to_procedure(device_id, procedure_id)
 
         success = True
+
+        # Kick off IFU pipeline in the background — finds the manual PDF via
+        # GUDID labeling URLs or Google Custom Search, extracts magnet/MRI facts,
+        # and stores them in brand_facts for the protocol layer to serve.
+        # Only fires for protocol-covered device classes; skips if we already
+        # have a completed record for this brand so we don't burn API quota.
+        ifu_status = "skipped"
+        manufacturer = record.get("manufacturer") or ""
+        brand_name = record.get("brand_name") or ""
+        model_number = record.get("model") or record.get("version_model_number") or ""
+        if protocol and not _ifu_already_attempted(manufacturer, brand_name):
+            t = threading.Thread(
+                target=_run_ifu_background,
+                args=(di, manufacturer, brand_name, model_number),
+                daemon=True,
+            )
+            t.start()
+            ifu_status = "started"
+
         result = {
             "success": True,
             "device_id": device_id,
             "device_identifier": di,
             "patient_id": str(patient_id).strip(),
             "fhir_url": f"{PUBLIC_FHIR_BASE_URL}/Device/{device_id}",
-            "brand_name": record.get("brand_name"),
-            "manufacturer": record.get("manufacturer"),
+            "brand_name": brand_name,
+            "manufacturer": manufacturer,
             "type": record.get("type"),
             "profile": US_CORE_IMPLANTABLE_DEVICE,
             "protocol": protocol,
             "implant": implant,
+            "ifu_pipeline": ifu_status,
         }
         if protocol_error:
             result["protocol_error"] = protocol_error

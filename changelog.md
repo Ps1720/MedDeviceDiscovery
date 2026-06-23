@@ -8,24 +8,28 @@ All notable changes to the PeriopUDI project are documented in this file. This c
 
 ---
 
-### Current Status — 2026-06-22
+### Current Status — 2026-06-23
 
-**Where we are:** The full GUDID + Google Custom Search → IFU PDF → LLM extraction
-pipeline is built and integrated end-to-end. Both API credentials (`GOOGLE_API_KEY`,
-`GOOGLE_CSE_ID`) are configured in `.env`. The pipeline has not yet been run against
-live devices — the next step is an end-to-end smoke test using the verified demo DIs.
+**Where we are:** The IFU pipeline now fires automatically in the background every time
+a device is documented via scan-to-chart. When a UDI is scanned and the device has a
+recognized protocol class (cardiac, neuro, diabetes), a daemon thread immediately starts
+searching for the manual PDF — first via GUDID labeling URLs, then via Google Custom
+Search — downloading and extracting magnet/MRI facts without blocking the scan response.
+The pipeline skips devices whose brand has already been processed (no wasted API quota).
 
 **What's wired up:**
+- Scan-to-chart auto-triggers IFU pipeline background thread on every successful document
 - GUDID DI lookup (v3 + v2) → Google Custom Search fallback → PDF download → magnet/MRI
   fact extraction via LLM → GUDID cross-validation → `brand_facts` storage
 - Google Custom Search keys set in `.env` (free tier: 100 queries/day)
+- `ifu_pipeline` field returned in the scan result (`"started"` or `"skipped"`)
 - All extracted facts remain `requires_verification=1` until a clinician runs `--verify`
 
 **Immediate next steps:**
-1. Run `python ifu_pipeline.py --di 00643169634589 --manufacturer Medtronic --brand "Azure XT DR" --model W1DR01 --verbose` end-to-end
-2. Confirm Google CSE returns a valid Medtronic IFU PDF
-3. Verify the LLM extracts `magnet_rate_bpm`, `magnet_mode`, and `mri_conditional` correctly
-4. Clinician review and sign-off (`--verify <id> --by "Dr. ..."`) before any protocol display
+1. Document the Abbott Aveir™ (`05415067040725`) — watch Docker logs for `[ifu-pipeline]` output
+2. Verify the IFU facts (magnet_mode: no magnet response for Aveir) appear in the protocol panel
+3. Clinician review and sign-off (`python ifu_pipeline.py --verify <id> --by "Dr. ..."`)
+4. Phase 6: SMART App Launch
 
 ---
 
@@ -620,5 +624,5 @@ To add to this changelog, follow the format:
 
 ---
 
-*Last updated: 2026-06-22*  
-*Phases 0–5 complete. Periop protocol layer, 3D heart visual, and IFU pipeline (GUDID + Google Custom Search) built. Google API keys configured. Next: end-to-end pipeline smoke test, then Phase 6 (SMART launch). Target submission: July 2026, presentation: November 10, 2026.*
+*Last updated: 2026-06-23*  
+*Phases 0–5 complete. Periop protocol layer, 3D heart visual, and IFU pipeline (GUDID + Google Custom Search) built and auto-wired into scan-to-chart. Pipeline fires in background on every scan. Next: verify Aveir™ IFU extraction in live logs, then Phase 6 (SMART launch). Target submission: July 2026, presentation: November 10, 2026.*
