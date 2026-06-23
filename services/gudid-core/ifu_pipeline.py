@@ -221,7 +221,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
         brand=args.brand,
         model=args.model,
         ifu_url=args.url,
-        verbose=True,
+        verbose=args.verbose,
     )
     print("\n── Summary ─────────────────────────────────────────")
     print(result["summary"])
@@ -280,6 +280,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list", action="store_true", help="List all stored IFU records")
     p.add_argument("--verify", type=int, metavar="ID", help="Mark IFU record ID as verified")
     p.add_argument("--by", default="", help="Verifier name (use with --verify)")
+    p.add_argument("--verbose", action="store_true", help="Print step-by-step progress")
     return p
 
 
