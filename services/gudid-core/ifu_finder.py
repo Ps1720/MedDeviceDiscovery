@@ -5,9 +5,10 @@ Tries in priority order:
   1. AccessGUDID v3 lookup — device record sometimes includes labeling URLs
   2. AccessGUDID v2 device endpoint — richer labeling metadata
   3. Google Custom Search JSON API (requires GOOGLE_API_KEY + GOOGLE_CSE_ID env vars)
-  4. Returns a constructed search hint URL the user can open manually
+  4. DuckDuckGo search — no API key required, automatic fallback
+  5. Returns a constructed search hint URL the user can open manually
 
-Google Custom Search setup:
+Google Custom Search setup (optional — DuckDuckGo is used if CSE fails):
   - GOOGLE_API_KEY: from console.cloud.google.com → APIs & Services → Credentials
   - GOOGLE_CSE_ID:  from cse.google.com → your engine's "Search engine ID"
                     (make sure "Search the entire web" is ON in CSE settings)
@@ -17,7 +18,7 @@ Google Custom Search setup:
 Result shape:
   {
     "url": str | None,          # direct PDF URL if found
-    "source": str,              # "gudid_v3" | "gudid_v2" | "google_cse" | "hint_only"
+    "source": str,              # "gudid_v3" | "gudid_v2" | "google_cse" | "duckduckgo" | "hint_only"
     "search_query": str,        # always set — human-readable search for manual fallback
     "search_hint_url": str,     # always set — Google search URL
   }
@@ -30,6 +31,12 @@ from typing import Optional
 from urllib.parse import quote_plus
 
 import requests
+
+try:
+    from duckduckgo_search import DDGS
+    _DDG_AVAILABLE = True
+except ImportError:
+    _DDG_AVAILABLE = False
 
 GUDID_V3_BASE = "https://accessgudid.nlm.nih.gov/api/v3"
 GUDID_V2_BASE = "https://accessgudid.nlm.nih.gov/api/2.0"
@@ -90,6 +97,23 @@ def _try_gudid_v2(di: str) -> Optional[str]:
         device = (data.get("gudid") or {}).get("device") or {}
         return _extract_labeling_url_from_gudid(device)
     except Exception:
+        return None
+
+
+def _try_duckduckgo(query: str) -> Optional[str]:
+    """DuckDuckGo text search — no API key required, used as fallback."""
+    if not _DDG_AVAILABLE:
+        return None
+    try:
+        with DDGS() as ddgs:
+            results = ddgs.text(query, max_results=10)
+            for r in results or []:
+                link = r.get("href", "")
+                if link.lower().endswith(".pdf"):
+                    return link
+        return None
+    except Exception as exc:
+        print(f"[ifu_finder] DuckDuckGo search failed: {exc}")
         return None
 
 
@@ -162,6 +186,11 @@ def find_ifu(
         url = _try_google_cse(search_query)
         if url:
             source = "google_cse"
+
+    if not url:
+        url = _try_duckduckgo(search_query)
+        if url:
+            source = "duckduckgo"
 
     return {
         "url": url,
