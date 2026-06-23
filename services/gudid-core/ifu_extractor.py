@@ -119,14 +119,37 @@ def _call_llm(text: str) -> Optional[dict]:
         resp = client.chat.completions.create(
             model=Config.OPENAI_MODEL,
             messages=[
-                {"role": "user", "content": _EXTRACTION_PROMPT + text}
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a medical device IFU parser. "
+                        "Output ONLY a valid JSON object — no thinking, no explanation, no markdown."
+                    ),
+                },
+                {"role": "user", "content": _EXTRACTION_PROMPT + text},
             ],
             temperature=0,
         )
         raw = resp.choices[0].message.content or ""
-        # Strip markdown fences if present
-        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
-        raw = re.sub(r"\s*```$", "", raw.strip())
+        original = raw
+
+        # Strip Qwen3 / reasoning-model thinking blocks
+        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        # Strip markdown fences
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw).strip()
+
+        # If the response is empty after stripping (model put everything in <think>),
+        # pull the first {...} JSON object found anywhere in the original response.
+        if not raw:
+            match = re.search(r"\{.*\}", original, re.DOTALL)
+            if match:
+                raw = match.group(0)
+
+        if not raw:
+            print("[ifu_extractor] LLM returned empty content after cleanup")
+            return None
+
         return json.loads(raw)
     except json.JSONDecodeError as exc:
         print(f"[ifu_extractor] LLM returned non-JSON: {exc}")
