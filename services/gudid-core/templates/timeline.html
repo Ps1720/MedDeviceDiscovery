@@ -226,7 +226,13 @@
         return chip(s.display.replace('MRI: ', ''), st.bg, st.fg);
       }).join(' ');
       return `
-      <div class="card flex flex-col relative" style="${border}">
+      <div class="card flex flex-col relative"
+           style="${border}"
+           data-fhir-id="${esc(d.id)}"
+           data-di="${esc(d.device_identifier || '')}"
+           data-mfr="${esc(d.manufacturer || '')}"
+           data-brand="${esc(d.name || '')}"
+           data-class-key="${esc(d.protocol_class || '')}">
         <button class="del-x" title="Delete device" onclick="deleteDevice('${esc(d.id)}', this)">&times;</button>
         <div class="p-4 flex flex-col h-full">
           <div class="flex items-start justify-between gap-2">
@@ -253,6 +259,7 @@
                   onclick="openProtocol('${esc(d.id)}')">
             Periop protocol →
           </button>` : ''}
+          <div id="qf-${esc(d.id)}" class="qf-stub"></div>
           <div class="text-[11px] mt-auto pt-3" style="color:var(--ink-4);">
             <a class="hover:underline" style="color:var(--primary);" href="${esc(d.fhir_url)}" target="_blank">FHIR Device/${esc(d.id)}</a>
             · ${esc((d.last_updated || '').split('T')[0])}
@@ -397,12 +404,106 @@
         grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
         devices.forEach(d => { devicesById[d.id] = d; });
         grid.innerHTML = devices.map(deviceCard).join('');
+        loadQuickFacts();
       } catch (e) {
         grid.className = '';
         grid.innerHTML = `<div class="rounded-2xl p-4" style="background:var(--coral-soft);color:var(--coral-deep);">Could not load chart: ${esc(e.message)}</div>`;
       }
     }
     load();
+
+    // ---- Quick-facts strip ----
+    function renderQuickFacts(fhirId, qf) {
+      const stub = document.getElementById('qf-' + fhirId);
+      if (!stub) return;
+
+      const lines = [];
+
+      // Headline (most critical — top of strip)
+      if (qf.headline) {
+        const sev = qf.headline_severity || 'caution';
+        const barColor = sev === 'critical' ? 'var(--coral)' : 'var(--honey)';
+        const bg       = sev === 'critical' ? 'var(--coral-soft)' : 'var(--honey-soft)';
+        const fg       = sev === 'critical' ? 'var(--coral-deep)' : 'var(--honey-deep)';
+        lines.push(`<div class="mt-3 rounded-xl px-3 py-2 text-[12px] leading-snug"
+            style="border-left:3px solid ${barColor};background:${bg};color:${fg};">
+          ${esc(qf.headline)}
+        </div>`);
+      }
+
+      // Sub-class badge (more specific than generic category chip)
+      const chips = [];
+      if (qf.subclass) {
+        chips.push(`<span class="chip" style="background:var(--slate-soft);color:var(--slate-deep);">${esc(qf.subclass)}</span>`);
+      }
+      if (qf.verify_required) {
+        chips.push(`<span class="chip" style="background:var(--coral-soft);color:var(--coral-deep);">⚠ VERIFY</span>`);
+      }
+      if (chips.length) {
+        lines.push(`<div class="flex flex-wrap gap-1 mt-2">${chips.join('')}</div>`);
+      }
+
+      // Fact rows
+      const facts = [];
+      if (qf.magnet) {
+        facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
+          <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">Magnet</span>
+          <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.magnet)}</span>
+        </div>`);
+      }
+      if (qf.electrocautery) {
+        facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
+          <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">Cautery</span>
+          <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.electrocautery)}</span>
+        </div>`);
+      }
+      if (qf.mri) {
+        facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
+          <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">MRI</span>
+          <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.mri)}</span>
+        </div>`);
+      }
+      if (facts.length) {
+        lines.push(`<div class="mt-2 text-[12px]">${facts.join('')}</div>`);
+      }
+
+      // Support phone
+      if (qf.support_phone) {
+        const phone = String(qf.support_phone).replace(/[^+\d]/g, '');
+        lines.push(`<a href="tel:${esc(phone)}" class="block mt-2 text-[12px] font-semibold hover:underline" style="color:var(--primary);">
+          📞 ${esc(qf.support_phone)}
+        </a>`);
+      }
+
+      // Pacer note
+      if (qf.pacer_note) {
+        lines.push(`<p class="mt-2 text-[11px] leading-snug" style="color:var(--ink-4);">
+          ${esc(qf.pacer_note)}
+        </p>`);
+      }
+
+      if (lines.length) {
+        stub.innerHTML = lines.join('');
+      }
+    }
+
+    async function loadQuickFacts() {
+      const cards = document.querySelectorAll('[data-class-key]');
+      await Promise.all(Array.from(cards).map(async card => {
+        const classKey = card.dataset.classKey;
+        const mfr      = card.dataset.mfr;
+        const brand    = card.dataset.brand;
+        const fhirId   = card.dataset.fhirId;
+        if (!classKey && !mfr) return;
+        try {
+          const params = new URLSearchParams({ manufacturer: mfr || '', brand: brand || '', class_key: classKey || '' });
+          const res = await fetch('/api/quick-facts?' + params);
+          if (!res.ok) return;
+          const qf = await res.json();
+          if (Object.keys(qf).length) renderQuickFacts(fhirId, qf);
+        } catch (_) { /* non-critical */ }
+      }));
+    }
 
     // ---- Edit / delete ----
     const editBtn = document.getElementById('edit-btn');

@@ -472,6 +472,89 @@ def api_protocol_by_di(di):
     return jsonify({"found": True, "device_identifier": di, "protocol": protocol})
 
 
+_CLASS_DISPLAY = {
+    "pacemaker":          "Transvenous Pacemaker",
+    "leadless_pacemaker": "Leadless Pacemaker",
+    "icd":                "ICD",
+    "crt_p":              "CRT-P",
+    "crt_d":              "CRT-D",
+    "vns":                "Vagus Nerve Stimulator",
+    "dbs":                "Deep Brain Stimulator",
+    "scs":                "Spinal Cord Stimulator",
+    "insulin_pump":       "Insulin Pump",
+    "cgm":                "CGM",
+    "closed_loop":        "Closed-Loop AID",
+}
+
+
+@app.route("/api/quick-facts")
+def api_quick_facts():
+    """
+    Lightweight card-level facts for a device: protocol headline, brand facts,
+    and pacer-dependence note. Used to populate the quick-facts strip on the
+    patient timeline card without loading the full protocol block.
+
+    Query params: di, manufacturer, brand, class_key
+    """
+    manufacturer = request.args.get("manufacturer", "")
+    brand        = request.args.get("brand", "")
+    class_key    = request.args.get("class_key", "")
+
+    result: dict = {}
+
+    if class_key:
+        result["subclass"] = _CLASS_DISPLAY.get(class_key, "")
+        class_facts = protocol_db.get_facts(class_key, "surgery")
+        headline_f = class_facts.get("headline")
+        if headline_f:
+            result["headline"]          = headline_f.get("fact_value", "")
+            result["headline_severity"] = headline_f.get("severity", "caution")
+        pacer_f = class_facts.get("pacer_dependence")
+        if pacer_f:
+            # Trim to the first sentence — card space is tight
+            full = pacer_f.get("fact_value", "")
+            result["pacer_note"] = (full.split(".")[0] + ".") if "." in full else full
+
+    if manufacturer or brand:
+        bf = protocol_db.get_brand_facts(manufacturer, brand, class_key or None)
+
+        def _val(key):
+            return (bf.get(key) or {}).get("fact_value") or None
+
+        magnet_rate = _val("magnet_rate")
+        magnet_mode = _val("magnet_mode")
+        mri_summary = _val("mri_conditions")
+        mri_cond    = _val("mri_conditional")
+        support     = _val("support_phone")
+        ec_full     = _val("electrocautery")
+
+        if magnet_rate:
+            parts = [f"{magnet_rate} bpm"]
+            if magnet_mode:
+                parts.append(str(magnet_mode))
+            result["magnet"] = " · ".join(parts)
+
+        if mri_summary:
+            result["mri"] = mri_summary[:120] + ("…" if len(mri_summary) > 120 else "")
+        elif mri_cond:
+            result["mri"] = "MRI Conditional" if str(mri_cond).lower() in ("true", "1", "yes") else "Not MRI Conditional"
+
+        if support:
+            result["support_phone"] = support
+
+        if ec_full:
+            # First sentence only — card is narrow
+            first = ec_full.split(".")[0].strip()
+            result["electrocautery"] = (first[:80] + "…") if len(first) > 80 else first
+
+        result["verify_required"] = any(
+            (row or {}).get("requires_verification") for row in bf.values()
+        )
+        result["has_brand_facts"] = bool(bf)
+
+    return jsonify(result)
+
+
 @app.route("/api/device/<device_id>/implant-site", methods=["PUT"])
 def api_set_implant_site(device_id):
     """
