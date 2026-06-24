@@ -615,14 +615,27 @@ def api_ifu_status():
     manufacturer = (request.args.get("manufacturer") or "").lower()
     brand        = (request.args.get("brand") or "").lower()
     for r in protocol_db.list_ifu_records():
-        if (r.get("manufacturer") or "").lower() == manufacturer and \
-           (r.get("brand") or "").lower() == brand:
+        r_mfr   = (r.get("manufacturer") or "").lower()
+        r_brand = (r.get("brand") or "").lower()
+        if r_mfr == manufacturer and r_brand == brand:
+            # Count brand_facts rows for this device to show on the UI
+            try:
+                conn = protocol_db.get_conn()
+                row = conn.execute(
+                    "SELECT COUNT(*) as n FROM brand_facts "
+                    "WHERE manufacturer_pattern = ? AND brand_pattern = ? AND source = 'llm'",
+                    (r_mfr, r_brand),
+                ).fetchone()
+                conn.close()
+                facts_count = row["n"] if row else 0
+            except Exception:
+                facts_count = 0
             return jsonify({
                 "found":            True,
                 "status":           r.get("status"),
-                "brand_facts_count": r.get("brand_facts_written", 0),
+                "brand_facts_count": facts_count,
                 "ifu_record_id":    r.get("id"),
-                "source":           r.get("source"),
+                "source":           r.get("finder_source") or r.get("source"),
             })
     return jsonify({"found": False, "status": None})
 

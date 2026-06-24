@@ -254,13 +254,19 @@
                         ? `<p class="text-[12px] mt-2" style="color:var(--honey-deep);">⚠ ${data.implant_site_warning}</p>`
                         : '';
 
-                    const ifuSection = data.ifu_pipeline === 'started'
-                        ? `<div class="mt-4 pt-4 flex items-center gap-2 text-[13px]" style="border-top:1px solid var(--rule);color:var(--ink-4);">
-                             <svg class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
-                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                             </svg>
-                             Searching for manufacturer PDF and extracting device facts…
+                    const ifuStarted = data.ifu_pipeline === 'started';
+                    const ifuSection = ifuStarted
+                        ? `<div id="ifu-status-strip" class="mt-4 pt-4" style="border-top:1px solid var(--rule);">
+                             <div id="ifu-status-inner" class="flex items-start gap-3 text-[13px]" style="color:var(--ink-4);">
+                               <svg id="ifu-spin" class="animate-spin w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24">
+                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                               </svg>
+                               <div>
+                                 <div id="ifu-status-msg" class="font-semibold">Finding manufacturer PDF…</div>
+                                 <div class="mt-0.5 text-[12px]" style="color:var(--ink-5);">AI extraction with local Qwen3-8B takes 2–4 minutes. This page updates automatically.</div>
+                               </div>
+                             </div>
                            </div>`
                         : `<div class="mt-4 pt-4" style="border-top:1px solid var(--rule);">
                              <p class="text-[12px] font-semibold mb-2" style="color:var(--ink-3);">Extract device facts from manufacturer PDF</p>
@@ -288,30 +294,119 @@
                         </dl>
                         ${implantWarn}
                         ${ifuSection}
-                        <a href="/patient/${data.patient_id}/timeline"
+                        <a id="view-timeline-btn" href="/patient/${data.patient_id}/timeline"
                            class="inline-block mt-4 px-4 py-2 rounded-xl text-[13px] font-semibold text-white" style="background:var(--ink);">View patient timeline →</a>
                     `, true);
 
-                    // Wire up the IFU URL form if it was rendered
-                    const ifuInput = document.getElementById('ifu-url-input');
-                    const ifuBtn   = document.getElementById('ifu-run-btn');
-                    const ifuMsg   = document.getElementById('ifu-url-msg');
-                    if (ifuBtn && ifuInput) {
+                    // Poll IFU status while pipeline is running and update the strip live
+                    if (ifuStarted) {
+                        const mfr   = data.manufacturer || '';
+                        const brand = data.brand_name   || '';
+                        const steps = [
+                            { after: 5,   msg: 'PDF found — downloading manufacturer manual…' },
+                            { after: 20,  msg: 'Extracting text from PDF…' },
+                            { after: 35,  msg: 'AI reading clinical content (Qwen3-8B)…' },
+                            { after: 90,  msg: 'AI generating structured facts — almost there…' },
+                            { after: 180, msg: 'Still running — large PDF or busy model…' },
+                        ];
+                        const startTs = Date.now();
+                        let stepIdx = 0;
+
+                        const msgEl  = document.getElementById('ifu-status-msg');
+                        const spinEl = document.getElementById('ifu-spin');
+                        const stripEl = document.getElementById('ifu-status-strip');
+                        const timelineBtn = document.getElementById('view-timeline-btn');
+
+                        let pollTimer = null;
+
+                        function advanceStepMessages() {
+                            const elapsed = (Date.now() - startTs) / 1000;
+                            while (stepIdx < steps.length && elapsed >= steps[stepIdx].after) {
+                                if (msgEl) msgEl.textContent = steps[stepIdx].msg;
+                                stepIdx++;
+                            }
+                        }
+
+                        async function pollIfu() {
+                            advanceStepMessages();
+                            try {
+                                const r = await fetch(`/api/ifu/status?manufacturer=${encodeURIComponent(mfr)}&brand=${encodeURIComponent(brand)}`);
+                                const s = await r.json();
+                                const doneStatuses = ['extracted', 'conflict', 'no_facts', 'verified'];
+                                if (s.found && doneStatuses.includes(s.status)) {
+                                    clearTimeout(pollTimer);
+                                    const facts = s.brand_facts_count || 0;
+                                    const isConflict = s.status === 'conflict';
+                                    const noFacts    = s.status === 'no_facts';
+                                    const color  = isConflict ? 'var(--honey-deep,#b45309)' : noFacts ? 'var(--ink-4)' : 'var(--emerald-deep,#16a34a)';
+                                    const bg     = isConflict ? '#fffbeb' : noFacts ? 'var(--surface-warm)' : 'var(--emerald-pale,#f0fdf4)';
+                                    const icon   = isConflict ? '⚠' : noFacts ? '—' : '✓';
+                                    const title  = isConflict
+                                        ? `Extracted with conflicts — ${facts} facts flagged for review`
+                                        : noFacts
+                                        ? 'PDF processed — no structured facts found'
+                                        : `Device facts extracted — ${facts} clinical facts saved`;
+                                    const body   = isConflict
+                                        ? 'Some extracted facts conflict with the GUDID record. Clinician review required before the facts are displayed.'
+                                        : noFacts
+                                        ? 'The PDF was read but no parsable clinical facts were found. Try a different PDF URL.'
+                                        : 'Magnet rate, MRI conditions, electrocautery guidance, and support phone are now on the timeline card. All facts require clinician verification before serving without the VERIFY banner.';
+                                    if (stripEl) stripEl.innerHTML = `
+                                        <div class="mt-4 pt-4 rounded-xl px-4 py-3" style="border-top:1px solid var(--rule);background:${bg};">
+                                          <div class="text-[13px] font-semibold mb-1" style="color:${color};">${icon} ${title}</div>
+                                          <div class="text-[12px]" style="color:var(--ink-4);">${body}</div>
+                                        </div>`;
+                                    if (timelineBtn && !isConflict && !noFacts) {
+                                        timelineBtn.textContent = 'View facts on timeline →';
+                                        timelineBtn.style.background = 'var(--emerald-deep,#16a34a)';
+                                    }
+                                    return;
+                                }
+                                if (s.status === 'failed') {
+                                    clearTimeout(pollTimer);
+                                    if (stripEl) stripEl.innerHTML = `
+                                        <div class="mt-4 pt-4 text-[13px]" style="border-top:1px solid var(--rule);color:var(--coral-deep);">
+                                          Extraction failed — you can paste a PDF URL below to retry manually.
+                                        </div>
+                                        <div class="mt-2 flex gap-2">
+                                          <input id="ifu-url-input" type="url" placeholder="https://…/physician-manual.pdf"
+                                            class="flex-1 text-[13px] px-3 py-2 rounded-xl outline-none"
+                                            style="border:1px solid var(--rule);background:var(--surface-warm);color:var(--ink);"
+                                            onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--rule)'">
+                                          <button id="ifu-run-btn" class="shrink-0 text-[13px] font-semibold px-4 py-2 rounded-xl text-white" style="background:var(--primary);">Retry</button>
+                                        </div>`;
+                                    wireRetryForm(data);
+                                    return;
+                                }
+                            } catch (_) {}
+                            pollTimer = setTimeout(pollIfu, 6000);
+                        }
+
+                        pollTimer = setTimeout(pollIfu, 8000);
+                    }
+
+                    // Wire up the manual IFU URL form (shown when pipeline wasn't auto-started,
+                    // or wired after a failed extraction)
+                    function wireRetryForm(d) {
+                        const ifuInput = document.getElementById('ifu-url-input');
+                        const ifuBtn   = document.getElementById('ifu-run-btn');
+                        const ifuMsg   = document.getElementById('ifu-url-msg');
+                        if (!ifuBtn || !ifuInput) return;
                         async function runIfu() {
                             const url = (ifuInput.value || '').trim();
-                            if (!url) { ifuMsg.textContent = 'Paste a PDF URL first.'; ifuMsg.style.color = 'var(--coral-deep)'; return; }
+                            if (!url) { if(ifuMsg) { ifuMsg.textContent = 'Paste a PDF URL first.'; ifuMsg.style.color = 'var(--coral-deep)'; } return; }
                             ifuBtn.disabled = true; ifuBtn.style.opacity = '0.5';
-                            ifuMsg.style.color = 'var(--ink-4)'; ifuMsg.textContent = 'Starting extraction…';
+                            if(ifuMsg) { ifuMsg.style.color = 'var(--ink-4)'; ifuMsg.textContent = 'Starting extraction…'; }
                             try {
                                 const r = await fetch('/api/ifu/extract', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                         url,
-                                        manufacturer: data.manufacturer || '',
-                                        brand:        data.brand_name  || '',
-                                        model:        data.brand_name  || '',
-                                        di:           data.device_identifier || '',
+                                        manufacturer: d.manufacturer || '',
+                                        brand:        d.brand_name  || '',
+                                        model:        d.brand_name  || '',
+                                        di:           d.device_identifier || '',
                                     }),
                                 });
                                 const rd = await r.json();
@@ -322,23 +417,21 @@
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                                           </svg>
-                                          Extracting device facts — this takes ~30–60 seconds.
-                                          Facts will appear on the patient timeline card when done.
+                                          Extracting — AI reads the PDF in 2–4 min. Facts appear on the timeline when done.
                                         </div>`;
                                 } else {
-                                    ifuMsg.textContent = rd.error || 'Failed to start.';
-                                    ifuMsg.style.color = 'var(--coral-deep)';
+                                    if(ifuMsg) { ifuMsg.textContent = rd.error || 'Failed to start.'; ifuMsg.style.color = 'var(--coral-deep)'; }
                                     ifuBtn.disabled = false; ifuBtn.style.opacity = '1';
                                 }
                             } catch (e) {
-                                ifuMsg.textContent = 'Network error — try again.';
-                                ifuMsg.style.color = 'var(--coral-deep)';
+                                if(ifuMsg) { ifuMsg.textContent = 'Network error — try again.'; ifuMsg.style.color = 'var(--coral-deep)'; }
                                 ifuBtn.disabled = false; ifuBtn.style.opacity = '1';
                             }
                         }
                         ifuBtn.addEventListener('click', runIfu);
                         ifuInput.addEventListener('keydown', e => { if (e.key === 'Enter') runIfu(); });
                     }
+                    if (!ifuStarted) wireRetryForm(data);
 
                     if (data.protocol) {
                         renderProtocolPanel(protocolBox, data.protocol, data.device_identifier);
