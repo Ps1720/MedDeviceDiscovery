@@ -8,28 +8,106 @@ All notable changes to the PeriopUDI project are documented in this file. This c
 
 ---
 
-### Current Status — 2026-06-23
+### Current Status — 2026-06-24
 
-**Where we are:** The IFU pipeline now fires automatically in the background every time
-a device is documented via scan-to-chart. When a UDI is scanned and the device has a
-recognized protocol class (cardiac, neuro, diabetes), a daemon thread immediately starts
-searching for the manual PDF — first via GUDID labeling URLs, then via Google Custom
-Search — downloading and extracting magnet/MRI facts without blocking the scan response.
-The pipeline skips devices whose brand has already been processed (no wasted API quota).
+**Where we are:** The IFU pipeline now finds device manuals without any external API keys
+for 13 of the most common perioperative device families — hitting a curated FCC filing
+table first (instant, no network call), then scraping fcc.report directly to pick the
+document labeled "User Manual" specifically (not test reports or SAR reports). The scan
+page now shows live step-by-step status messages while the AI reads the PDF, and
+automatically switches to a success or conflict card when done. The pipeline no longer
+shows the manual PDF input form when a device has already been extracted.
 
 **What's wired up:**
-- Scan-to-chart auto-triggers IFU pipeline background thread on every successful document
-- GUDID DI lookup (v3 + v2) → Google Custom Search fallback → PDF download → magnet/MRI
-  fact extraction via LLM → GUDID cross-validation → `brand_facts` storage
-- Google Custom Search keys set in `.env` (free tier: 100 queries/day)
-- `ifu_pipeline` field returned in the scan result (`"started"` or `"skipped"`)
-- All extracted facts remain `requires_verification=1` until a clinician runs `--verify`
+- **Curated seed table** (`data/ifu_seed.json`) — 13 device families with confirmed FCC
+  User Manual PDF URLs: Medtronic Azure S/XT, Cobalt/Crome, Percepta/Serena/Solara,
+  Micra; Abbott/SJM ICD family; Boston Scientific CRM 3300 series; Nevro HFX;
+  Dexcom G6/Stelo; Omnipod 5; Medtronic Guardian Link; Tandem t:slim
+- **Zero-API-key IFU finding** for all seeded devices — instant local lookup
+- **FCC targeted scraper** — when Bing finds the filing page, scrapes fcc.report HTML to
+  pick specifically the "User Manual" document (not the first PDF, which may be a test
+  report or SAR report)
+- **EUDAMED groundwork** — queries EU device registry for cross-validation; will return
+  IFU URLs automatically when the EU eIFU mandate is enforced (phasing in May 2026)
+- **Live scan-page status strip** — step-by-step messages ("Finding PDF…", "Downloading…",
+  "AI reading clinical content…") poll every 6 s and replace the spinner with a green
+  success card showing the facts count when extraction completes
+- **Correct timing** — message now says 2–4 minutes (was wrong "30–60 seconds")
+- **Already-extracted devices** — scan page shows "Facts already extracted — N clinical
+  facts on file" instead of the manual PDF input form
 
 **Immediate next steps:**
-1. Document the Abbott Aveir™ (`05415067040725`) — watch Docker logs for `[ifu-pipeline]` output
-2. Verify the IFU facts (magnet_mode: no magnet response for Aveir) appear in the protocol panel
+1. Test with a new device not yet in the DB to see the live status strip in action
+2. Go to patient timeline after extraction to see the quick-facts strip (magnet rate, MRI, support phone)
 3. Clinician review and sign-off (`python ifu_pipeline.py --verify <id> --by "Dr. ..."`)
 4. Phase 6: SMART App Launch
+
+---
+
+### Added — IFU Finder: Curated Seed Table + FCC Targeted Scraper + EUDAMED (2026-06-24)
+
+Removes the need for any external API key to find manuals for the 13 most common
+perioperative device families. Adds a hand-verified local lookup table and a direct
+fcc.report scraper that picks the "User Manual" document specifically.
+
+**`data/ifu_seed.json`** — new curated seed table. Each entry stores the FCC grantee ID
+and confirmed direct PDF URL for the physician manual, verified against the fcc.report
+filing page. Covers:
+
+| Category | Devices |
+|---|---|
+| Pacemakers | Medtronic Azure S/XT SR/DR, Cobalt/Crome XT SR/DR/CRT-D, Percepta/Serena/Solara CRT-P, Micra leadless |
+| ICDs | Abbott/SJM family (Gallant, Ellipse), Boston Scientific CRM 3300 series |
+| Neurostimulators | Nevro HFX IPG3000 (prescriber manual selected) |
+| CGM | Dexcom G6, Dexcom Stelo |
+| Insulin pumps | Omnipod 5, Medtronic Guardian Link (MiniMed 600/700 series), Tandem t:slim |
+
+**`ifu_finder.py` — three new functions:**
+
+- **`_try_curated(manufacturer, brand, model)`** — loads the seed JSON once (cached in
+  memory), matches by manufacturer + brand keyword substring (case-insensitive), returns
+  the PDF URL instantly with no network call. Logged with FCC ID for traceability.
+
+- **`_try_fcc(manufacturer, brand, model)`** _(enhanced)_ — now a two-step process:
+  (1) Bing `site:fcc.report/FCC-ID` to find the filing index page;
+  (2) scrape that page's HTML table to find the row labeled "User Manual" or
+  "Users Manual" specifically — not the first PDF on the page, which may be a
+  test report, SAR report, or cover letter. Falls back to the filing URL if scraping
+  fails.
+
+- **`_scrape_fcc_filing(url)`** — shared helper; given any `fcc.report/FCC-ID/XXXXX`
+  page, parses `<td><a>document name</a></td>…<td><a href="…pdf">` table rows and
+  returns the User Manual PDF URL. Tested on LF5BLEIMPLANT (Azure XT DR): correctly
+  returns `3357083.pdf` (User Manual, 349 KB) not `3357077.pdf` (Test Report, 1.8 MB).
+
+- **`_try_eudamed(di)`** — queries EUDAMED EU device registry API for the device UUID
+  and manufacturer. Currently returns `None` for URL (EUDAMED API has no IFU document
+  fields yet — the EU eIFU mandate is phasing in through May 2026). Will return IFU URLs
+  automatically when EUDAMED adds them. Already wired into the priority chain.
+
+**Updated lookup priority chain:**
+```
+curated → GUDID v3 → GUDID v2 → EUDAMED → manufacturer_site → FCC targeted
+  → Bing → Google CSE → DuckDuckGo → hint_only
+```
+
+**`scan_to_chart.py`** — when `_ifu_already_attempted()` is True (device already in DB),
+now looks up the existing IFU record status and returns it as `ifu_pipeline` so the scan
+page shows the right UI state instead of falling back to the manual URL input form.
+
+**`scan_to_chart.html`** — scan page now shows live extraction progress:
+- Step-by-step messages update every 6 s while the pipeline runs
+- Timing corrected to 2–4 minutes (was wrong "30–60 seconds")
+- On completion: green success card with facts count; "View facts on timeline →" button
+  turns green
+- On conflict: amber warning card explaining review needed
+- On failure: falls back to manual PDF URL input form
+- Already-extracted devices: shows "Facts already extracted — N clinical facts on file"
+  card immediately (fetches real count from `/api/ifu/status`)
+
+**`/api/ifu/status`** — now counts `brand_facts` rows directly from the DB so
+`brand_facts_count` is always accurate (was returning `None` before because the column
+wasn't stored in `ifu_records`).
 
 ---
 
@@ -624,5 +702,5 @@ To add to this changelog, follow the format:
 
 ---
 
-*Last updated: 2026-06-23*  
-*Phases 0–5 complete. Periop protocol layer, 3D heart visual, and IFU pipeline (GUDID + Google Custom Search) built and auto-wired into scan-to-chart. Pipeline fires in background on every scan. Next: verify Aveir™ IFU extraction in live logs, then Phase 6 (SMART launch). Target submission: July 2026, presentation: November 10, 2026.*
+*Last updated: 2026-06-24*  
+*Phases 0–5 complete. Periop protocol layer, 3D heart visual, and IFU pipeline fully wired. Pipeline now finds manuals for 13 device families with zero API keys via curated FCC seed table. Scan page shows live 2–4 min extraction progress and auto-updates on completion. Next: clinical verification of extracted facts, then Phase 6 (SMART launch). Target submission: July 2026, presentation: November 10, 2026.*
