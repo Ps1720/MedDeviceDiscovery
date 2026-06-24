@@ -1,0 +1,174 @@
+{
+  "_comment": "Curated seed table of confirmed FCC User Manual PDFs for common perioperative devices. Each entry was hand-verified against the fcc.report filing page. Add new entries as devices are encountered; set verified:true after a clinician reviews the extracted facts.",
+  "version": "1.1",
+  "devices": [
+
+    {
+      "label": "Medtronic Azure S/XT SR/DR MRI SureScan",
+      "manufacturer_pattern": "medtronic",
+      "brand_patterns": ["azure"],
+      "fcc_id": "LF5BLEIMPLANT",
+      "ifu_url": "https://fcc.report/FCC-ID/LF5BLEIMPLANT/3357083.pdf",
+      "category": "pacemaker",
+      "notes": "Azure S SR, Azure S DR, Azure XT SR, Azure XT DR MRI SureScan. Dual-chamber and single-chamber MRI-conditional pacemakers.",
+      "verified": false
+    },
+
+    {
+      "label": "Medtronic Cobalt/Crome XT SR/DR/CRT-D MRI SureScan",
+      "manufacturer_pattern": "medtronic",
+      "brand_patterns": ["cobalt", "crome"],
+      "fcc_id": "LF5BLEIMPLANT4",
+      "ifu_url": "https://fcc.report/FCC-ID/LF5BLEIMPLANT4/4674812.pdf",
+      "category": "icd",
+      "notes": "Cobalt XT VR/DR MRI, Crome VR/DR MRI, Cobalt XT HF CRT-D MRI, Cobalt HF CRT-D MRI, Crome HF CRT-D MRI. 2023 generation.",
+      "verified": false
+    },
+
+    {
+      "label": "Medtronic Percepta/Serena/Solara CRT-P MRI SureScan",
+      "manufacturer_pattern": "medtronic",
+      "brand_patterns": ["percepta", "serena", "solara"],
+      "fcc_id": "LF5BLEIMPLANT2",
+      "ifu_url": "https://fcc.report/FCC-ID/LF5BLEIMPLANT2/3375096.pdf",
+      "category": "crt-p",
+      "notes": "Percepta CRT-P, Percepta Quad CRT-P, Serena CRT-P, Serena Quad CRT-P, Solara CRT-P, Solara Quad CRT-P. All MRI SureScan.",
+      "verified": false
+    },
+
+    {
+      "label": "Medtronic Micra Leadless Pacemaker",
+      "manufacturer_pattern": "medtronic",
+      "brand_patterns": ["micra"],
+      "fcc_id": "P7G170793",
+      "ifu_url": "https://fcc.report/FCC-ID/P7G170793/6837439.pdf",
+      "category": "pacemaker",
+      "notes": "Medtronic Micra leadless transcatheter pacemaker (filed under Covidien LLC, a Medtronic subsidiary). Covers Micra AV and Micra VR. 2023 filing.",
+      "verified": false
+    },
+
+    {
+      "label": "Abbott/SJM ICD Family (Gallant, Ellipse)",
+      "manufacturer_pattern": "abbott",
+      "brand_patterns": ["gallant", "ellipse", "fortify", "aveir"],
+      "fcc_id": "RIAICDRFNGQ",
+      "ifu_url": "https://fcc.report/FCC-ID/RIAICDRFNGQ/6663395.pdf",
+      "category": "icd",
+      "notes": "Abbott (formerly St. Jude Medical) ICD family. FCC ID covers multiple ICD models including Gallant and related devices. Updated 2024.",
+      "verified": false
+    },
+
+    {
+      "label": "Boston Scientific CRM 3300 Series (Resonate/Dynagen/Energen)",
+      "manufacturer_pattern": "boston",
+      "brand_patterns": ["resonate", "dynagen", "energen", "inceptia", "renogen"],
+      "fcc_id": "ESCCRM330017",
+      "ifu_url": "https://fcc.report/FCC-ID/ESCCRM330017/3439973.pdf",
+      "category": "icd",
+      "notes": "Boston Scientific CRM 3300 product family (2017 filing). Covers Resonate, Dynagen, Energen and related BSc ICD/CRT-D devices.",
+      "verified": false
+    },
+
+    {
+      "label": "Nevro HFX IPG3000 Spinal Cord Stimulator",
+      "manufacturer_pattern": "nevro",
+      "brand_patterns": ["hfx", "ipg3000", "ipg 3000"],
+      "fcc_id": "XKYIPG3000",
+      "ifu_url": "https://fcc.report/FCC-ID/XKYIPG3000/5885970.pdf",
+      "category": "scs",
+      "notes": "Nevro HFX spinal cord stimulator IPG3000 (2022 generation). Prescriber/HCP manual selected (5885970) over patient manual. Includes 10 kHz therapy info.",
+      "verified": false
+    },
+
+    {
+      "label": "Nevro HFX IPG2000 Spinal Cord Stimulator",
+      "manufacturer_pattern": "nevro",
+      "brand_patterns": ["ipg2000", "ipg 2000"],
+      "fcc_id": "XKYIPG2000",
+      "ifu_url": "https://fcc.report/FCC-ID/XKYIPG2000",
+      "category": "scs",
+      "notes": "Nevro HFX spinal cord stimulator IPG2000 (2017 generation). URL is the filing page — scrape will find User Manual.",
+      "verified": false,
+      "_note": "No User Manual URL confirmed yet — will fallback to FCC scraper"
+    },
+
+    {
+      "label": "Dexcom G6 Transmitter",
+      "manufacturer_pattern": "dexcom",
+      "brand_patterns": ["g6"],
+      "fcc_id": "PH29588",
+      "ifu_url": "https://fcc.report/FCC-ID/PH29588/3465883.pdf",
+      "category": "cgm",
+      "notes": "Dexcom G6 CGM transmitter. Communicates glucose to the G6 receiver or compatible smart device. No internal battery replacement.",
+      "verified": false
+    },
+
+    {
+      "label": "Dexcom G7 Transmitter",
+      "manufacturer_pattern": "dexcom",
+      "brand_patterns": ["g7"],
+      "fcc_id": "PH29799",
+      "ifu_url": "https://fcc.report/FCC-ID/PH29799",
+      "category": "cgm",
+      "notes": "Dexcom G7 CGM transmitter/sensor (integrated design, 2023+). URL is the filing page — scrape will find User Manual.",
+      "verified": false,
+      "_note": "FCC filing page not loading during research — will fallback to FCC scraper"
+    },
+
+    {
+      "label": "Dexcom Stelo Transmitter",
+      "manufacturer_pattern": "dexcom",
+      "brand_patterns": ["stelo"],
+      "fcc_id": "PH29788",
+      "ifu_url": "https://fcc.report/FCC-ID/PH29788/5415859.pdf",
+      "category": "cgm",
+      "notes": "Dexcom Stelo OTC CGM transmitter (2024). Over-the-counter, no prescription required. Shares platform with G7.",
+      "verified": false
+    },
+
+    {
+      "label": "Omnipod 5 Automated Insulin Delivery System",
+      "manufacturer_pattern": "insulet",
+      "brand_patterns": ["omnipod 5", "omnipod5"],
+      "fcc_id": "RBV029",
+      "ifu_url": "https://fcc.report/FCC-ID/RBV029/5122564.pdf",
+      "category": "pump",
+      "notes": "Insulet Omnipod 5 tubeless insulin pump pod. Communicates with Dexcom G6/G7 for automated closed-loop dosing.",
+      "verified": false
+    },
+
+    {
+      "label": "Omnipod 5 Pod (alternate filing)",
+      "manufacturer_pattern": "insulet",
+      "brand_patterns": ["omnipod"],
+      "fcc_id": "RBV029D",
+      "ifu_url": "https://fcc.report/FCC-ID/RBV029D",
+      "category": "pump",
+      "notes": "Insulet Omnipod 5 Pod (RBV029D). Alternate FCC filing for pod hardware variant.",
+      "verified": false
+    },
+
+    {
+      "label": "Medtronic Guardian Link Transmitter (MiniMed 600/700 series)",
+      "manufacturer_pattern": "medtronic",
+      "brand_patterns": ["guardian", "minimed 600", "minimed 670", "minimed 770", "minimed 780"],
+      "fcc_id": "OH27731",
+      "ifu_url": "https://fcc.report/FCC-ID/OH27731/2541487.pdf",
+      "category": "cgm",
+      "notes": "Medtronic Guardian Link CGM transmitter for MiniMed 600-series pumps (670G, 770G, 780G). Collects sensor glucose and transmits to insulin pump.",
+      "verified": false
+    },
+
+    {
+      "label": "Tandem t:slim Insulin Delivery System",
+      "manufacturer_pattern": "tandem",
+      "brand_patterns": ["t:slim", "tslim"],
+      "fcc_id": "CWO-TWM001",
+      "ifu_url": "https://fcc.report/FCC-ID/CWO-TWM001/1721038.pdf",
+      "category": "pump",
+      "notes": "Tandem Diabetes Care t:slim insulin pump (2012 original FCC filing). The t:slim X2 is a software/hardware revision of the same platform; no separate FCC filing found. Manual covers core pump operation.",
+      "verified": false
+    }
+
+  ]
+}

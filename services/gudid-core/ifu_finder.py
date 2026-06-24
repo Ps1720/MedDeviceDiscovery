@@ -2,6 +2,8 @@
 IFU (Instructions for Use) document URL finder.
 
 Tries in priority order:
+  0. Curated seed table  — hand-verified FCC User Manual PDFs for ~15 common periop
+                           devices (no network call needed; instant lookup)
   1. AccessGUDID v3      — labeling URLs embedded in the FDA record
   2. AccessGUDID v2      — richer labeling metadata
   3. EUDAMED             — EU device database; returns IFU URL when present (mandate
@@ -39,7 +41,9 @@ Result shape:
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import Optional
 from urllib.parse import quote_plus
 
@@ -57,6 +61,55 @@ BING_API_KEY   = os.environ.get("BING_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")   # kept as fallback
 GOOGLE_CSE_ID  = os.environ.get("GOOGLE_CSE_ID")
 TIMEOUT = 10
+
+# Curated seed table — loaded once, cached in memory
+_SEED_PATH = Path(__file__).parent / "data" / "ifu_seed.json"
+_seed_cache: list[dict] | None = None
+
+
+def _load_seed() -> list[dict]:
+    global _seed_cache
+    if _seed_cache is None:
+        try:
+            _seed_cache = json.loads(_SEED_PATH.read_text())["devices"]
+        except Exception as exc:
+            print(f"[ifu_finder] seed load error: {exc}")
+            _seed_cache = []
+    return _seed_cache
+
+
+def _try_curated(manufacturer: str, brand: str, model: str) -> Optional[tuple[str, str]]:
+    """
+    Look up the device in the curated seed table (data/ifu_seed.json).
+
+    Returns (ifu_url, fcc_id) if matched, None otherwise.
+    Matching is case-insensitive substring: manufacturer_pattern must appear in
+    manufacturer, and at least one brand_pattern must appear in brand or model.
+
+    No network calls — instant lookup from a hand-verified local table.
+    """
+    mfr_l   = manufacturer.lower()
+    brand_l  = (brand  or "").lower()
+    model_l  = (model  or "").lower()
+
+    for entry in _load_seed():
+        # Skip entries with no confirmed URL (filing page only)
+        url = entry.get("ifu_url", "")
+        if not url or "/FCC-ID/" not in url or not url.endswith(".pdf"):
+            # Entry only has a filing page URL — delegate to FCC scraper later
+            continue
+
+        if entry.get("manufacturer_pattern", "") not in mfr_l:
+            continue
+
+        matched = any(
+            bp in brand_l or bp in model_l
+            for bp in entry.get("brand_patterns", [])
+        )
+        if matched:
+            return url, entry.get("fcc_id", "")
+
+    return None
 
 
 def _build_search_query(manufacturer: str, brand: str, model: str) -> str:
@@ -370,18 +423,27 @@ def find_ifu(
     url: Optional[str] = None
     source = "hint_only"
 
-    if di:
+    # Step 0: curated seed — instant, no network call
+    curated = _try_curated(manufacturer, brand, model)
+    if curated:
+        url, _fcc_id = curated
+        source = "curated"
+        print(f"[ifu_finder] curated hit: {_fcc_id} → {url}")
+
+    if not url and di:
         url = _try_gudid_v3(di)
         if url:
             source = "gudid_v3"
-        if not url:
-            url = _try_gudid_v2(di)
-            if url:
-                source = "gudid_v2"
-        if not url:
-            url = _try_eudamed(di)
-            if url:
-                source = "eudamed"
+
+    if not url and di:
+        url = _try_gudid_v2(di)
+        if url:
+            source = "gudid_v2"
+
+    if not url and di:
+        url = _try_eudamed(di)
+        if url:
+            source = "eudamed"
 
     if not url:
         url = _try_manufacturer_site(manufacturer, brand, model)
