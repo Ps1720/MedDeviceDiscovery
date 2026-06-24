@@ -2,26 +2,34 @@
 IFU (Instructions for Use) document URL finder.
 
 Tries in priority order:
-  1. AccessGUDID v3 lookup — device record sometimes includes labeling URLs
-  2. AccessGUDID v2 device endpoint — richer labeling metadata
-  3. Bing Web Search API v7 (requires BING_API_KEY — Azure Bing Search v7 resource)
-  4. Google Custom Search JSON API (requires GOOGLE_API_KEY + GOOGLE_CSE_ID env vars)
-  5. DuckDuckGo search — no API key required, automatic fallback
-  6. Returns a constructed search hint URL the user can open manually
+  1. AccessGUDID v3  — labeling URLs embedded in the FDA record
+  2. AccessGUDID v2  — richer labeling metadata
+  3. Manufacturer site — Bing search restricted to the manufacturer's own manual domain
+  4. FCC database     — Bing search on fcc.report (contains RF-device manuals submitted to FCC)
+  5. Bing general     — full-web Bing search for PDF
+  6. Google CSE       — fallback if Bing key not set
+  7. DuckDuckGo       — last-resort web search, no key required
+  8. hint_only        — returns a Google search URL for manual lookup
 
-Google Custom Search setup (optional — DuckDuckGo is used if CSE fails):
-  - GOOGLE_API_KEY: from console.cloud.google.com → APIs & Services → Credentials
-  - GOOGLE_CSE_ID:  from cse.google.com → your engine's "Search engine ID"
-                    (make sure "Search the entire web" is ON in CSE settings)
-  Free tier: 100 queries/day. After that: $5 per 1,000 queries.
-  For this pipeline (one run per device model, ever) you will not exceed the free tier.
+Manufacturer manual domains (used for targeted Bing site: searches):
+  Medtronic          → manuals.medtronic.com
+  Abbott / St. Jude  → cardiovascular.abbott
+  Boston Scientific  → bostonscientific.com
+  Biotronik          → biotronik.com
+  LivaNova           → livanova.com
+  Nevro              → nevro.com
+  Neuropace          → neuropace.com
+  Tandem             → tandemdiabetes.com
+  Insulet / Omnipod  → insulet.com
+  Dexcom             → dexcom.com
+  Abbott Diabetes    → diabetes.abbott
 
 Result shape:
   {
-    "url": str | None,          # direct PDF URL if found
-    "source": str,              # "gudid_v3" | "gudid_v2" | "google_cse" | "duckduckgo" | "hint_only"
-    "search_query": str,        # always set — human-readable search for manual fallback
-    "search_hint_url": str,     # always set — Google search URL
+    "url": str | None,
+    "source": str,   # "gudid_v3"|"gudid_v2"|"manufacturer_site"|"fcc"|"bing"|"google_cse"|"duckduckgo"|"hint_only"
+    "search_query": str,
+    "search_hint_url": str,
   }
 """
 
@@ -119,12 +127,28 @@ def _try_duckduckgo(query: str) -> Optional[str]:
         return None
 
 
-def _try_bing(query: str) -> Optional[str]:
-    """
-    Bing Web Search API v7 — searches the entire web for PDF URLs.
-    Requires BING_API_KEY (Azure Bing Search v7 resource, Key 1).
-    Free tier: 1,000 calls/month — well within budget for one call per device model.
-    """
+# Manufacturer name fragments → their official manual domain
+_MANUFACTURER_DOMAINS: dict[str, str] = {
+    "medtronic":        "manuals.medtronic.com",
+    "abbott":           "cardiovascular.abbott",
+    "st. jude":         "cardiovascular.abbott",
+    "stjude":           "cardiovascular.abbott",
+    "boston scientific":"bostonscientific.com",
+    "boston":           "bostonscientific.com",
+    "biotronik":        "biotronik.com",
+    "livanova":         "livanova.com",
+    "cyberonics":       "livanova.com",
+    "nevro":            "nevro.com",
+    "neuropace":        "neuropace.com",
+    "tandem":           "tandemdiabetes.com",
+    "insulet":          "insulet.com",
+    "omnipod":          "insulet.com",
+    "dexcom":           "dexcom.com",
+}
+
+
+def _bing_query(query: str, label: str) -> Optional[str]:
+    """Run a single Bing Web Search query and return the first PDF URL found."""
     if not BING_API_KEY:
         return None
     try:
@@ -135,7 +159,7 @@ def _try_bing(query: str) -> Optional[str]:
             timeout=TIMEOUT,
         )
         if resp.status_code != 200:
-            print(f"[ifu_finder] Bing error {resp.status_code}: {resp.text[:200]}")
+            print(f"[ifu_finder] Bing {label} error {resp.status_code}: {resp.text[:200]}")
             return None
         for item in (resp.json().get("webPages") or {}).get("value") or []:
             url = item.get("url", "")
@@ -143,8 +167,49 @@ def _try_bing(query: str) -> Optional[str]:
                 return url
         return None
     except Exception as exc:
-        print(f"[ifu_finder] Bing exception: {exc}")
+        print(f"[ifu_finder] Bing {label} exception: {exc}")
         return None
+
+
+def _try_manufacturer_site(manufacturer: str, brand: str, model: str) -> Optional[str]:
+    """
+    Bing search restricted to the manufacturer's own manual domain.
+    Most likely source of the correct physician manual.
+    """
+    mfr_lower = manufacturer.lower()
+    domain = None
+    for key, d in _MANUFACTURER_DOMAINS.items():
+        if key in mfr_lower:
+            domain = d
+            break
+    if not domain:
+        return None
+    # Search within the manufacturer site for brand + model manual PDF
+    parts = [p for p in [brand, model] if p]
+    query = f'site:{domain} {" ".join(parts)} physician manual filetype:pdf'
+    result = _bing_query(query, "manufacturer_site")
+    if not result:
+        # Fallback: looser query without filetype restriction (some sites serve PDFs without .pdf extension)
+        query2 = f'site:{domain} {" ".join(parts)} manual'
+        result = _bing_query(query2, "manufacturer_site_loose")
+    return result
+
+
+def _try_fcc(manufacturer: str, brand: str, model: str) -> Optional[str]:
+    """
+    Search the FCC ID database (fcc.report) via Bing.
+    fcc.report hosts device manuals and test reports submitted for RF certification —
+    a reliable source for implantable devices with wireless/RF components (pacemakers,
+    ICDs, CGMs, insulin pumps). The filing typically contains the full physician manual.
+    """
+    parts = [p for p in [manufacturer, brand, model] if p]
+    query = f'site:fcc.report {" ".join(parts)} filetype:pdf'
+    return _bing_query(query, "fcc")
+
+
+def _try_bing(query: str) -> Optional[str]:
+    """Bing general web search — full web, any domain."""
+    return _bing_query(query, "general")
 
 
 def _try_google_cse(query: str) -> Optional[str]:
@@ -211,6 +276,16 @@ def find_ifu(
             url = _try_gudid_v2(di)
             if url:
                 source = "gudid_v2"
+
+    if not url:
+        url = _try_manufacturer_site(manufacturer, brand, model)
+        if url:
+            source = "manufacturer_site"
+
+    if not url:
+        url = _try_fcc(manufacturer, brand, model)
+        if url:
+            source = "fcc"
 
     if not url:
         url = _try_bing(search_query)
