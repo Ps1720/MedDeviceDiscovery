@@ -254,7 +254,34 @@
                         ? `<p class="text-[12px] mt-2" style="color:var(--honey-deep);">⚠ ${data.implant_site_warning}</p>`
                         : '';
 
-                    const ifuStarted = data.ifu_pipeline === 'started';
+                    const ifuPipeline = data.ifu_pipeline || '';
+                    const ifuStarted  = ifuPipeline === 'started';
+                    const doneStates  = ['extracted', 'conflict', 'no_facts', 'verified'];
+                    const ifuDone     = doneStates.includes(ifuPipeline);
+
+                    function ifuDoneCard(status, factsCount) {
+                        const isConflict = status === 'conflict';
+                        const noFacts    = status === 'no_facts';
+                        const color  = isConflict ? 'var(--honey-deep,#b45309)' : noFacts ? 'var(--ink-4)' : 'var(--emerald-deep,#16a34a)';
+                        const bg     = isConflict ? '#fffbeb' : noFacts ? 'var(--surface-warm)' : 'var(--emerald-pale,#f0fdf4)';
+                        const icon   = isConflict ? '⚠' : noFacts ? '—' : '✓';
+                        const title  = isConflict
+                            ? `Facts extracted with conflicts — ${factsCount} facts flagged for review`
+                            : noFacts
+                            ? 'PDF processed — no structured facts found'
+                            : `Facts already extracted — ${factsCount} clinical facts on file`;
+                        const body   = isConflict
+                            ? 'Some extracted facts conflict with the GUDID record. Clinician review required before the facts are displayed.'
+                            : noFacts
+                            ? 'The PDF was read but no parsable clinical facts were found. Try a different PDF URL below.'
+                            : 'Magnet rate, MRI conditions, electrocautery guidance, and support phone are already on the timeline card.';
+                        return `<div class="mt-4 pt-4 rounded-xl px-4 py-3" id="ifu-status-strip"
+                                     style="border-top:1px solid var(--rule);background:${bg};">
+                                  <div class="text-[13px] font-semibold mb-1" style="color:${color};">${icon} ${title}</div>
+                                  <div class="text-[12px]" style="color:var(--ink-4);">${body}</div>
+                                </div>`;
+                    }
+
                     const ifuSection = ifuStarted
                         ? `<div id="ifu-status-strip" class="mt-4 pt-4" style="border-top:1px solid var(--rule);">
                              <div id="ifu-status-inner" class="flex items-start gap-3 text-[13px]" style="color:var(--ink-4);">
@@ -268,6 +295,8 @@
                                </div>
                              </div>
                            </div>`
+                        : ifuDone
+                        ? ifuDoneCard(ifuPipeline, '?')
                         : `<div class="mt-4 pt-4" style="border-top:1px solid var(--rule);">
                              <p class="text-[12px] font-semibold mb-2" style="color:var(--ink-3);">Extract device facts from manufacturer PDF</p>
                              <div class="flex gap-2">
@@ -297,6 +326,15 @@
                         <a id="view-timeline-btn" href="/patient/${data.patient_id}/timeline"
                            class="inline-block mt-4 px-4 py-2 rounded-xl text-[13px] font-semibold text-white" style="background:var(--ink);">View patient timeline →</a>
                     `, true);
+
+                    // If already done, fetch the real facts count and re-render the card
+                    if (ifuDone) {
+                        fetch(`/api/ifu/status?manufacturer=${encodeURIComponent(data.manufacturer||'')}&brand=${encodeURIComponent(data.brand_name||'')}`)
+                            .then(r => r.json()).then(s => {
+                                const strip = document.getElementById('ifu-status-strip');
+                                if (strip) strip.outerHTML = ifuDoneCard(ifuPipeline, s.brand_facts_count || 0);
+                            }).catch(() => {});
+                    }
 
                     // Poll IFU status while pipeline is running and update the strip live
                     if (ifuStarted) {

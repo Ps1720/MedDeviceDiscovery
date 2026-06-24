@@ -222,10 +222,23 @@ def document_device(
         # and stores them in brand_facts for the protocol layer to serve.
         # Only fires for protocol-covered device classes; skips if we already
         # have a completed record for this brand so we don't burn API quota.
-        ifu_status = "skipped"
         manufacturer = record.get("manufacturer") or ""
         brand_name = record.get("brand_name") or ""
         model_number = record.get("model") or record.get("version_model_number") or ""
+
+        # Check for existing IFU record first so the UI can show current status
+        existing_ifu_status = None
+        try:
+            mfr_l  = manufacturer.lower()
+            brand_l = brand_name.lower()
+            for r in protocol_db.list_ifu_records():
+                if (r.get("manufacturer") or "").lower() == mfr_l and \
+                   (r.get("brand") or "").lower() == brand_l:
+                    existing_ifu_status = r.get("status")
+                    break
+        except Exception:
+            pass
+
         if protocol and not _ifu_already_attempted(manufacturer, brand_name):
             t = threading.Thread(
                 target=_run_ifu_background,
@@ -234,6 +247,12 @@ def document_device(
             )
             t.start()
             ifu_status = "started"
+        elif existing_ifu_status:
+            # Already have a record — surface its status so the UI shows the
+            # right card (success/conflict/no_facts) instead of the manual form
+            ifu_status = existing_ifu_status
+        else:
+            ifu_status = "skipped"
 
         result = {
             "success": True,
