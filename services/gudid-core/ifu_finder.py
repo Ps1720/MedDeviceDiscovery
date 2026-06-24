@@ -2,14 +2,17 @@
 IFU (Instructions for Use) document URL finder.
 
 Tries in priority order:
-  1. AccessGUDID v3  — labeling URLs embedded in the FDA record
-  2. AccessGUDID v2  — richer labeling metadata
-  3. Manufacturer site — Bing search restricted to the manufacturer's own manual domain
-  4. FCC database     — Bing search on fcc.report (contains RF-device manuals submitted to FCC)
-  5. Bing general     — full-web Bing search for PDF
-  6. Google CSE       — fallback if Bing key not set
-  7. DuckDuckGo       — last-resort web search, no key required
-  8. hint_only        — returns a Google search URL for manual lookup
+  1. AccessGUDID v3      — labeling URLs embedded in the FDA record
+  2. AccessGUDID v2      — richer labeling metadata
+  3. EUDAMED             — EU device database; returns IFU URL when present (mandate
+                           phasing in through May 2026 — groundwork for future coverage)
+  4. Manufacturer site   — Bing search restricted to the manufacturer's own manual domain
+  5. FCC database        — two-step: find filing page via Bing, then scrape to pick the
+                           document specifically labeled "User Manual" (not test reports)
+  6. Bing general        — full-web Bing search for PDF
+  7. Google CSE          — fallback if Bing key not set
+  8. DuckDuckGo          — last-resort web search, no key required
+  9. hint_only           — returns a Google search URL for manual lookup
 
 Manufacturer manual domains (used for targeted Bing site: searches):
   Medtronic          → manuals.medtronic.com
@@ -27,7 +30,8 @@ Manufacturer manual domains (used for targeted Bing site: searches):
 Result shape:
   {
     "url": str | None,
-    "source": str,   # "gudid_v3"|"gudid_v2"|"manufacturer_site"|"fcc"|"bing"|"google_cse"|"duckduckgo"|"hint_only"
+    "source": str,   # "gudid_v3"|"gudid_v2"|"eudamed"|"manufacturer_site"|"fcc"
+                     # |"bing"|"google_cse"|"duckduckgo"|"hint_only"
     "search_query": str,
     "search_hint_url": str,
   }
@@ -197,14 +201,112 @@ def _try_manufacturer_site(manufacturer: str, brand: str, model: str) -> Optiona
 
 def _try_fcc(manufacturer: str, brand: str, model: str) -> Optional[str]:
     """
-    Search the FCC ID database (fcc.report) via Bing.
-    fcc.report hosts device manuals and test reports submitted for RF certification —
-    a reliable source for implantable devices with wireless/RF components (pacemakers,
-    ICDs, CGMs, insulin pumps). The filing typically contains the full physician manual.
+    Two-step FCC database lookup via fcc.report.
+
+    Step 1 — find the FCC filing page (Bing site:fcc.report/FCC-ID search).
+    Step 2 — scrape that page and pick the document labeled 'User Manual'
+             or 'Users Manual', not just the first PDF (avoids test reports,
+             SAR reports, and cover letters).
+
+    fcc.report hosts manuals submitted for RF certification — pacemakers, ICDs,
+    CGMs, and insulin pumps all require FCC certification and submit full manuals.
     """
+    import re as _re
+
     parts = [p for p in [manufacturer, brand, model] if p]
-    query = f'site:fcc.report {" ".join(parts)} filetype:pdf'
-    return _bing_query(query, "fcc")
+
+    # Step 1: find the FCC filing index page
+    filing_url = _bing_query(
+        f'site:fcc.report/FCC-ID {" ".join(parts)}', "fcc_page"
+    )
+    if not filing_url:
+        # Fallback: find any PDF on fcc.report and return it
+        return _bing_query(
+            f'site:fcc.report {" ".join(parts)} filetype:pdf', "fcc_pdf"
+        )
+
+    # Normalise to the filing index URL (strip any document path after the FCC ID)
+    m = _re.match(r'(https://fcc\.report/FCC-ID/[^/\?]+)', filing_url)
+    filing_base = m.group(1) if m else filing_url
+
+    # Step 2: scrape the filing page — pick the User Manual document
+    result = _scrape_fcc_filing(filing_base)
+    return result or filing_url
+
+
+def _scrape_fcc_filing(filing_base_url: str) -> Optional[str]:
+    """
+    Given a fcc.report filing page URL, scrape and return the User Manual PDF URL.
+    Shared by _try_fcc() and any direct FCC ID lookup.
+    """
+    import re as _re
+    try:
+        resp = requests.get(
+            filing_base_url,
+            timeout=TIMEOUT,
+            headers={"User-Agent": "PeriopUDI/1.0"},
+        )
+        if resp.status_code != 200:
+            return None
+        rows = _re.findall(
+            r'<td[^>]*><a href="/FCC-ID/[^"]+">([^<]+)</a></td>.*?'
+            r'<td><a href="(/FCC-ID/[^"]+\.pdf)"',
+            resp.text, _re.DOTALL,
+        )
+        for doc_name, pdf_path in rows:
+            if "user manual" in doc_name.lower() or "users manual" in doc_name.lower():
+                return f"https://fcc.report{pdf_path}"
+        for doc_name, pdf_path in rows:
+            if "manual" in doc_name.lower():
+                return f"https://fcc.report{pdf_path}"
+        if rows:
+            return f"https://fcc.report{rows[0][1]}"
+    except Exception as exc:
+        print(f"[ifu_finder] FCC scrape error: {exc}")
+    return None
+
+
+def _try_eudamed(di: str) -> Optional[str]:
+    """
+    Query EUDAMED (EU medical device database) for the device record.
+
+    Currently EUDAMED's public API returns device metadata (manufacturer,
+    risk class, EU registration status) but NOT IFU document URLs — the
+    EU eIFU mandate (requiring manufacturers to register IFU links) is being
+    phased in through May 2026. This function is groundwork: when EUDAMED
+    adds labeling URLs to its API response, this will return them automatically.
+
+    For now it returns None for the URL but logs the EU registration status,
+    which is useful for validation (e.g. confirming the manufacturer name).
+    """
+    if not di:
+        return None
+    try:
+        resp = requests.get(
+            "https://ec.europa.eu/tools/eudamed/api/devices/udiDiData",
+            params={"fullTextSearchValue": di, "page": 0, "pageSize": 5},
+            timeout=TIMEOUT,
+            headers={"Accept": "application/json"},
+        )
+        if resp.status_code != 200:
+            return None
+        items = resp.json().get("content") or []
+        for item in items:
+            if item.get("primaryDi") == di or item.get("basicUdi") == di:
+                # Check for any labeling/document URL fields (future-proofing)
+                for key in ("labelUrl", "ifu_url", "labellingUrl",
+                            "electronicIfu", "labelingUrl"):
+                    val = item.get(key)
+                    if val and str(val).startswith("http"):
+                        return val
+                # Log EU registration for debugging
+                mfr = item.get("manufacturerName", "")
+                risk = (item.get("riskClass") or {}).get("code", "")
+                print(f"[ifu_finder] EUDAMED: found EU record — {mfr} risk={risk}")
+                return None
+    except Exception as exc:
+        print(f"[ifu_finder] EUDAMED exception: {exc}")
+    return None
 
 
 def _try_bing(query: str) -> Optional[str]:
@@ -276,6 +378,10 @@ def find_ifu(
             url = _try_gudid_v2(di)
             if url:
                 source = "gudid_v2"
+        if not url:
+            url = _try_eudamed(di)
+            if url:
+                source = "eudamed"
 
     if not url:
         url = _try_manufacturer_site(manufacturer, brand, model)
