@@ -253,6 +253,29 @@
                     const implantWarn = data.implant_site_warning
                         ? `<p class="text-[12px] mt-2" style="color:var(--honey-deep);">⚠ ${data.implant_site_warning}</p>`
                         : '';
+
+                    const ifuSection = data.ifu_pipeline === 'started'
+                        ? `<div class="mt-4 pt-4 flex items-center gap-2 text-[13px]" style="border-top:1px solid var(--rule);color:var(--ink-4);">
+                             <svg class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
+                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                             </svg>
+                             Searching for manufacturer PDF and extracting device facts…
+                           </div>`
+                        : `<div class="mt-4 pt-4" style="border-top:1px solid var(--rule);">
+                             <p class="text-[12px] font-semibold mb-2" style="color:var(--ink-3);">Extract device facts from manufacturer PDF</p>
+                             <div class="flex gap-2">
+                               <input id="ifu-url-input" type="url" placeholder="https://…/physician-manual.pdf"
+                                 class="flex-1 text-[13px] px-3 py-2 rounded-xl outline-none"
+                                 style="border:1px solid var(--rule);background:var(--surface-warm);color:var(--ink);min-width:0;"
+                                 onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--rule)'">
+                               <button id="ifu-run-btn"
+                                 class="shrink-0 text-[13px] font-semibold px-4 py-2 rounded-xl text-white transition"
+                                 style="background:var(--primary);">Run</button>
+                             </div>
+                             <p id="ifu-url-msg" class="text-[12px] mt-1.5" style="color:var(--ink-4);min-height:1.2em;"></p>
+                           </div>`;
+
                     show(`
                         <h2 class="text-[16px] font-semibold mb-2" style="color:var(--emerald-deep);">✓ Device documented in ${ms} ms</h2>
                         <dl class="text-[13px] space-y-1" style="color:var(--ink-2);">
@@ -264,9 +287,59 @@
                             ${implantLine}
                         </dl>
                         ${implantWarn}
+                        ${ifuSection}
                         <a href="/patient/${data.patient_id}/timeline"
                            class="inline-block mt-4 px-4 py-2 rounded-xl text-[13px] font-semibold text-white" style="background:var(--ink);">View patient timeline →</a>
                     `, true);
+
+                    // Wire up the IFU URL form if it was rendered
+                    const ifuInput = document.getElementById('ifu-url-input');
+                    const ifuBtn   = document.getElementById('ifu-run-btn');
+                    const ifuMsg   = document.getElementById('ifu-url-msg');
+                    if (ifuBtn && ifuInput) {
+                        async function runIfu() {
+                            const url = (ifuInput.value || '').trim();
+                            if (!url) { ifuMsg.textContent = 'Paste a PDF URL first.'; ifuMsg.style.color = 'var(--coral-deep)'; return; }
+                            ifuBtn.disabled = true; ifuBtn.style.opacity = '0.5';
+                            ifuMsg.style.color = 'var(--ink-4)'; ifuMsg.textContent = 'Starting extraction…';
+                            try {
+                                const r = await fetch('/api/ifu/extract', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        url,
+                                        manufacturer: data.manufacturer || '',
+                                        brand:        data.brand_name  || '',
+                                        model:        data.brand_name  || '',
+                                        di:           data.device_identifier || '',
+                                    }),
+                                });
+                                const rd = await r.json();
+                                if (rd.started) {
+                                    ifuInput.closest('div').innerHTML = `
+                                        <div class="flex items-center gap-2 text-[13px]" style="color:var(--ink-4);">
+                                          <svg class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                          </svg>
+                                          Extracting device facts — this takes ~30–60 seconds.
+                                          Facts will appear on the patient timeline card when done.
+                                        </div>`;
+                                } else {
+                                    ifuMsg.textContent = rd.error || 'Failed to start.';
+                                    ifuMsg.style.color = 'var(--coral-deep)';
+                                    ifuBtn.disabled = false; ifuBtn.style.opacity = '1';
+                                }
+                            } catch (e) {
+                                ifuMsg.textContent = 'Network error — try again.';
+                                ifuMsg.style.color = 'var(--coral-deep)';
+                                ifuBtn.disabled = false; ifuBtn.style.opacity = '1';
+                            }
+                        }
+                        ifuBtn.addEventListener('click', runIfu);
+                        ifuInput.addEventListener('keydown', e => { if (e.key === 'Enter') runIfu(); });
+                    }
+
                     if (data.protocol) {
                         renderProtocolPanel(protocolBox, data.protocol, data.device_identifier);
                     }
