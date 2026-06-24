@@ -413,10 +413,9 @@
     load();
 
     // ---- Quick-facts strip ----
-    function renderQuickFacts(fhirId, qf) {
+    function renderQuickFacts(fhirId, qf, cardEl) {
       const stub = document.getElementById('qf-' + fhirId);
       if (!stub) return;
-
       const lines = [];
 
       // Headline (most critical — top of strip)
@@ -431,60 +430,144 @@
         </div>`);
       }
 
-      // Sub-class badge (more specific than generic category chip)
+      // Sub-class badge + VERIFY chip
       const chips = [];
-      if (qf.subclass) {
-        chips.push(`<span class="chip" style="background:var(--slate-soft);color:var(--slate-deep);">${esc(qf.subclass)}</span>`);
-      }
-      if (qf.verify_required) {
-        chips.push(`<span class="chip" style="background:var(--coral-soft);color:var(--coral-deep);">⚠ VERIFY</span>`);
-      }
-      if (chips.length) {
-        lines.push(`<div class="flex flex-wrap gap-1 mt-2">${chips.join('')}</div>`);
-      }
+      if (qf.subclass) chips.push(`<span class="chip" style="background:var(--slate-soft);color:var(--slate-deep);">${esc(qf.subclass)}</span>`);
+      if (qf.verify_required) chips.push(`<span class="chip" style="background:var(--coral-soft);color:var(--coral-deep);">⚠ VERIFY</span>`);
+      if (chips.length) lines.push(`<div class="flex flex-wrap gap-1 mt-2">${chips.join('')}</div>`);
 
-      // Fact rows
-      const facts = [];
-      if (qf.magnet) {
-        facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
-          <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">Magnet</span>
-          <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.magnet)}</span>
-        </div>`);
-      }
-      if (qf.electrocautery) {
-        facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
-          <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">Cautery</span>
-          <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.electrocautery)}</span>
-        </div>`);
-      }
-      if (qf.mri) {
-        facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
-          <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">MRI</span>
-          <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.mri)}</span>
-        </div>`);
-      }
-      if (facts.length) {
-        lines.push(`<div class="mt-2 text-[12px]">${facts.join('')}</div>`);
-      }
+      // Brand facts (magnet / cautery / MRI)
+      if (qf.has_brand_facts) {
+        const facts = [];
+        if (qf.magnet) facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
+            <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">Magnet</span>
+            <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.magnet)}</span></div>`);
+        if (qf.electrocautery) facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
+            <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">Cautery</span>
+            <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.electrocautery)}</span></div>`);
+        if (qf.mri) facts.push(`<div class="flex gap-2 items-start py-1" style="border-top:1px solid var(--rule-soft);">
+            <span class="shrink-0 text-[11px] pt-0.5" style="color:var(--ink-4);">MRI</span>
+            <span class="text-[12px] font-medium" style="color:var(--ink-2);">${esc(qf.mri)}</span></div>`);
+        if (facts.length) lines.push(`<div class="mt-2 text-[12px]">${facts.join('')}</div>`);
 
-      // Support phone
-      if (qf.support_phone) {
-        const phone = String(qf.support_phone).replace(/[^+\d]/g, '');
-        lines.push(`<a href="tel:${esc(phone)}" class="block mt-2 text-[12px] font-semibold hover:underline" style="color:var(--primary);">
-          📞 ${esc(qf.support_phone)}
-        </a>`);
+        if (qf.support_phone) {
+          const phone = String(qf.support_phone).replace(/[^+\d]/g, '');
+          lines.push(`<a href="tel:${esc(phone)}" class="block mt-2 text-[12px] font-semibold hover:underline" style="color:var(--primary);">📞 ${esc(qf.support_phone)}</a>`);
+        }
+      } else {
+        // No brand facts yet — show PDF URL form (unless extraction is running)
+        const status = qf.ifu_status;
+        if (status === 'pending') {
+          lines.push(ifuPendingHTML());
+        } else {
+          lines.push(ifuFormHTML(fhirId, cardEl));
+        }
       }
 
       // Pacer note
-      if (qf.pacer_note) {
-        lines.push(`<p class="mt-2 text-[11px] leading-snug" style="color:var(--ink-4);">
-          ${esc(qf.pacer_note)}
-        </p>`);
+      if (qf.pacer_note) lines.push(`<p class="mt-2 text-[11px] leading-snug" style="color:var(--ink-4);">${esc(qf.pacer_note)}</p>`);
+
+      stub.innerHTML = lines.join('');
+
+      // Wire up the form if it was injected
+      const form = stub.querySelector('.ifu-url-form');
+      if (form) wireIfuForm(form, fhirId, cardEl);
+    }
+
+    function ifuPendingHTML() {
+      return `<div class="mt-3 flex items-center gap-2 text-[12px]" style="color:var(--ink-4);">
+        <svg class="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+        </svg>
+        Extracting device facts from PDF…
+      </div>`;
+    }
+
+    function ifuFormHTML(fhirId, cardEl) {
+      return `
+        <div class="ifu-url-form mt-3 pt-3" style="border-top:1px solid var(--rule-soft);">
+          <p class="text-[11px] font-semibold mb-1.5" style="color:var(--ink-4);">No device facts — paste manufacturer PDF URL:</p>
+          <div class="flex gap-1.5">
+            <input type="url" placeholder="https://…/manual.pdf"
+              class="ifu-url-input flex-1 text-[12px] px-2.5 py-1.5 rounded-lg outline-none"
+              style="border:1px solid var(--rule);background:var(--surface-warm);color:var(--ink);min-width:0;"
+              onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--rule)'">
+            <button class="ifu-url-btn shrink-0 text-[12px] font-semibold px-3 py-1.5 rounded-lg text-white transition"
+              style="background:var(--primary);">Run</button>
+          </div>
+          <p class="ifu-url-msg text-[11px] mt-1" style="color:var(--ink-4);min-height:1em;"></p>
+        </div>`;
+    }
+
+    function wireIfuForm(form, fhirId, cardEl) {
+      const input  = form.querySelector('.ifu-url-input');
+      const btn    = form.querySelector('.ifu-url-btn');
+      const msg    = form.querySelector('.ifu-url-msg');
+
+      async function submit() {
+        const url = (input.value || '').trim();
+        if (!url) { msg.textContent = 'Paste a PDF URL first.'; msg.style.color = 'var(--coral-deep)'; return; }
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        msg.style.color = 'var(--ink-4)';
+        msg.textContent = 'Starting…';
+        try {
+          const res = await fetch('/api/ifu/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url,
+              manufacturer: cardEl.dataset.mfr  || '',
+              brand:        cardEl.dataset.brand || '',
+              model:        cardEl.dataset.brand || '',
+              di:           cardEl.dataset.di    || '',
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.started) {
+            msg.textContent = data.error || 'Failed to start extraction.';
+            msg.style.color = 'var(--coral-deep)';
+            btn.disabled = false; btn.style.opacity = '1';
+            return;
+          }
+          // Show spinner, then poll
+          const stub = document.getElementById('qf-' + fhirId);
+          if (stub) stub.innerHTML = ifuPendingHTML();
+          pollIfuStatus(fhirId, cardEl, 5000);
+        } catch (e) {
+          msg.textContent = 'Network error — try again.';
+          msg.style.color = 'var(--coral-deep)';
+          btn.disabled = false; btn.style.opacity = '1';
+        }
       }
 
-      if (lines.length) {
-        stub.innerHTML = lines.join('');
-      }
+      btn.addEventListener('click', submit);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    }
+
+    function pollIfuStatus(fhirId, cardEl, intervalMs) {
+      const mfr   = cardEl.dataset.mfr   || '';
+      const brand = cardEl.dataset.brand || '';
+      const timer = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/ifu/status?manufacturer=${encodeURIComponent(mfr)}&brand=${encodeURIComponent(brand)}`);
+          const data = await res.json();
+          const done = ['extracted', 'verified', 'conflict', 'no_facts'];
+          if (data.found && done.includes(data.status)) {
+            clearInterval(timer);
+            // Re-fetch quick-facts and re-render the strip
+            const params = new URLSearchParams({ manufacturer: mfr, brand, class_key: cardEl.dataset.classKey || '' });
+            const qfRes = await fetch('/api/quick-facts?' + params);
+            if (qfRes.ok) {
+              const qf = await qfRes.json();
+              renderQuickFacts(fhirId, qf, cardEl);
+            }
+          }
+        } catch (_) { /* keep polling */ }
+      }, intervalMs);
+      // Safety: stop polling after 5 minutes
+      setTimeout(() => clearInterval(timer), 5 * 60 * 1000);
     }
 
     async function loadQuickFacts() {
@@ -500,7 +583,7 @@
           const res = await fetch('/api/quick-facts?' + params);
           if (!res.ok) return;
           const qf = await res.json();
-          if (Object.keys(qf).length) renderQuickFacts(fhirId, qf);
+          if (Object.keys(qf).length) renderQuickFacts(fhirId, qf, card);
         } catch (_) { /* non-critical */ }
       }));
     }

@@ -32,10 +32,12 @@ from scan_to_chart import (
     delete_device,
     set_implant_site,
 )
+import threading
 import overrides as institution_overrides
 import protocol_db
 import protocol_seed
 import protocol_service
+import ifu_pipeline
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -552,7 +554,77 @@ def api_quick_facts():
         )
         result["has_brand_facts"] = bool(bf)
 
+    # IFU extraction status (pending/extracted/conflict/no_facts/none)
+    if manufacturer or brand:
+        mfr_l  = manufacturer.lower()
+        brand_l = brand.lower()
+        for r in protocol_db.list_ifu_records():
+            if (r.get("manufacturer") or "").lower() == mfr_l and \
+               (r.get("brand") or "").lower() == brand_l:
+                result["ifu_status"]  = r.get("status")
+                result["ifu_record_id"] = r.get("id")
+                break
+        else:
+            result["ifu_status"] = None
+
     return jsonify(result)
+
+
+@app.route("/api/ifu/extract", methods=["POST"])
+def api_ifu_extract():
+    """
+    Trigger IFU pipeline in the background for a known PDF URL.
+    Body: { di, manufacturer, brand, model, url }
+    Returns immediately; poll /api/ifu/status for progress.
+    """
+    data = request.get_json(silent=True) or {}
+    url          = (data.get("url") or "").strip()
+    manufacturer = (data.get("manufacturer") or "").strip()
+    brand        = (data.get("brand") or "").strip()
+    model        = (data.get("model") or "").strip()
+    di           = (data.get("di") or "").strip() or None
+
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    if not manufacturer and not brand:
+        return jsonify({"error": "manufacturer or brand required"}), 400
+
+    def _run():
+        try:
+            ifu_pipeline.run_pipeline(
+                manufacturer=manufacturer,
+                brand=brand,
+                model=model or brand,
+                di=di,
+                ifu_url=url,
+                verbose=False,
+            )
+        except Exception as exc:
+            print(f"[api/ifu/extract] pipeline error: {exc}")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"started": True})
+
+
+@app.route("/api/ifu/status")
+def api_ifu_status():
+    """
+    Current IFU record status for a manufacturer + brand.
+    Query params: manufacturer, brand
+    """
+    manufacturer = (request.args.get("manufacturer") or "").lower()
+    brand        = (request.args.get("brand") or "").lower()
+    for r in protocol_db.list_ifu_records():
+        if (r.get("manufacturer") or "").lower() == manufacturer and \
+           (r.get("brand") or "").lower() == brand:
+            return jsonify({
+                "found":            True,
+                "status":           r.get("status"),
+                "brand_facts_count": r.get("brand_facts_written", 0),
+                "ifu_record_id":    r.get("id"),
+                "source":           r.get("source"),
+            })
+    return jsonify({"found": False, "status": None})
 
 
 @app.route("/api/device/<device_id>/implant-site", methods=["PUT"])
