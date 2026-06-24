@@ -4,9 +4,10 @@ IFU (Instructions for Use) document URL finder.
 Tries in priority order:
   1. AccessGUDID v3 lookup — device record sometimes includes labeling URLs
   2. AccessGUDID v2 device endpoint — richer labeling metadata
-  3. Google Custom Search JSON API (requires GOOGLE_API_KEY + GOOGLE_CSE_ID env vars)
-  4. DuckDuckGo search — no API key required, automatic fallback
-  5. Returns a constructed search hint URL the user can open manually
+  3. Bing Web Search API v7 (requires BING_API_KEY — Azure Bing Search v7 resource)
+  4. Google Custom Search JSON API (requires GOOGLE_API_KEY + GOOGLE_CSE_ID env vars)
+  5. DuckDuckGo search — no API key required, automatic fallback
+  6. Returns a constructed search hint URL the user can open manually
 
 Google Custom Search setup (optional — DuckDuckGo is used if CSE fails):
   - GOOGLE_API_KEY: from console.cloud.google.com → APIs & Services → Credentials
@@ -40,8 +41,9 @@ except ImportError:
 
 GUDID_V3_BASE = "https://accessgudid.nlm.nih.gov/api/v3"
 GUDID_V2_BASE = "https://accessgudid.nlm.nih.gov/api/2.0"
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-GOOGLE_CSE_ID = os.environ.get("GOOGLE_CSE_ID")
+BING_API_KEY   = os.environ.get("BING_API_KEY")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")   # kept as fallback
+GOOGLE_CSE_ID  = os.environ.get("GOOGLE_CSE_ID")
 TIMEOUT = 10
 
 
@@ -117,6 +119,34 @@ def _try_duckduckgo(query: str) -> Optional[str]:
         return None
 
 
+def _try_bing(query: str) -> Optional[str]:
+    """
+    Bing Web Search API v7 — searches the entire web for PDF URLs.
+    Requires BING_API_KEY (Azure Bing Search v7 resource, Key 1).
+    Free tier: 1,000 calls/month — well within budget for one call per device model.
+    """
+    if not BING_API_KEY:
+        return None
+    try:
+        resp = requests.get(
+            "https://api.bing.microsoft.com/v7.0/search",
+            headers={"Ocp-Apim-Subscription-Key": BING_API_KEY},
+            params={"q": query, "count": 10, "mkt": "en-US", "responseFilter": "Webpages"},
+            timeout=TIMEOUT,
+        )
+        if resp.status_code != 200:
+            print(f"[ifu_finder] Bing error {resp.status_code}: {resp.text[:200]}")
+            return None
+        for item in (resp.json().get("webPages") or {}).get("value") or []:
+            url = item.get("url", "")
+            if url.lower().endswith(".pdf"):
+                return url
+        return None
+    except Exception as exc:
+        print(f"[ifu_finder] Bing exception: {exc}")
+        return None
+
+
 def _try_google_cse(query: str) -> Optional[str]:
     """
     Google Custom Search JSON API — returns first PDF result URL.
@@ -181,6 +211,11 @@ def find_ifu(
             url = _try_gudid_v2(di)
             if url:
                 source = "gudid_v2"
+
+    if not url:
+        url = _try_bing(search_query)
+        if url:
+            source = "bing"
 
     if not url:
         url = _try_google_cse(search_query)
