@@ -66,6 +66,98 @@ TIMEOUT = 10
 _SEED_PATH = Path(__file__).parent / "data" / "ifu_seed.json"
 _seed_cache: list[dict] | None = None
 
+# Offline manual library — PDFs committed to the repo (data/manuals/).
+# This is tried FIRST: no network, no rate limits, no bot-blocking. The
+# fcc.report URLs in ifu_seed.json now 403 on every automated request, so the
+# local library is what actually makes the curated path work.
+_MANUAL_DIR = Path(__file__).parent / "data" / "manuals"
+_MANUAL_INDEX = _MANUAL_DIR / "index.json"
+_manual_cache: list[dict] | None = None
+
+
+def _load_manuals() -> list[dict]:
+    global _manual_cache
+    if _manual_cache is None:
+        try:
+            entries = json.loads(_MANUAL_INDEX.read_text())["manuals"]
+            # Only advertise manuals whose PDF is actually present.
+            _manual_cache = [e for e in entries if (_MANUAL_DIR / e["file"]).is_file()]
+            missing = len(entries) - len(_manual_cache)
+            if missing:
+                print(f"[ifu_finder] {missing} indexed manual(s) missing from disk "
+                      f"— run scripts/fetch_manuals.py")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ifu_finder] manual index load error: {exc}")
+            _manual_cache = []
+    return _manual_cache
+
+
+def _matches(entry: dict, mfr_l: str, brand_l: str, model_l: str) -> bool:
+    """Shared matcher: manufacturer substring + any brand pattern in brand/model."""
+    if entry.get("manufacturer_pattern", "") not in mfr_l:
+        return False
+    return any(
+        bp in brand_l or bp in model_l
+        for bp in entry.get("brand_patterns", [])
+    )
+
+
+def find_local_manual(manufacturer: str, brand: str, model: str = "") -> Optional[dict]:
+    """
+    Best offline manual for this device, or None.
+
+    Returns the index entry with an added "path" (absolute) and "url"
+    (app-relative, served by the /manuals/<file> route). Preference goes to the
+    entry with the most brand-pattern specificity, so a device-specific manual
+    wins over a family-wide one.
+    """
+    mfr_l = (manufacturer or "").lower()
+    brand_l = (brand or "").lower()
+    model_l = (model or "").lower()
+
+    hits = [e for e in _load_manuals() if _matches(e, mfr_l, brand_l, model_l)]
+    if not hits:
+        return None
+
+    def rank(entry: dict) -> tuple[int, int]:
+        # `priority` (1 = primary clinician manual, 3 = supplement/checklist) is
+        # what decides. Without it a 2-page checklist can beat the 300-page
+        # physician's manual just by matching a longer brand string.
+        matched = [
+            bp for bp in entry.get("brand_patterns", [])
+            if bp in brand_l or bp in model_l
+        ]
+        return (entry.get("priority", 2), -max(len(bp) for bp in matched))
+
+    best = min(hits, key=rank)
+    return {
+        **best,
+        "path": str(_MANUAL_DIR / best["file"]),
+        "url": f"/manuals/{best['file']}",
+    }
+
+
+def list_local_manuals() -> list[dict]:
+    """Every manual present on disk (for the admin/tools page)."""
+    return [
+        {**e, "url": f"/manuals/{e['file']}"}
+        for e in _load_manuals()
+    ]
+
+
+def _try_local(manufacturer: str, brand: str, model: str) -> Optional[str]:
+    """
+    Step -1: the offline library. Returns the app-relative "/manuals/<file>"
+    form — the one canonical way a local manual is referenced. It is what gets
+    stored in the DB, shown in the UI, and opened in a browser;
+    ifu_extractor resolves it back to a path on disk.
+    """
+    hit = find_local_manual(manufacturer, brand, model)
+    if not hit:
+        return None
+    print(f"[ifu_finder] local manual hit: {hit['file']}")
+    return hit["url"]
+
 
 def _load_seed() -> list[dict]:
     global _seed_cache
@@ -423,8 +515,14 @@ def find_ifu(
     url: Optional[str] = None
     source = "hint_only"
 
+    # Step -1: offline manual library — instant, no network, never rate-limited.
+    local = _try_local(manufacturer, brand, model)
+    if local:
+        url = local
+        source = "local_manual"
+
     # Step 0: curated seed — instant, no network call
-    curated = _try_curated(manufacturer, brand, model)
+    curated = _try_curated(manufacturer, brand, model) if not url else None
     if curated:
         url, _fcc_id = curated
         source = "curated"

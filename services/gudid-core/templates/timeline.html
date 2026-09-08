@@ -487,7 +487,7 @@
     function ifuFormHTML(fhirId, cardEl) {
       return `
         <div class="ifu-url-form mt-3 pt-3" style="border-top:1px solid var(--rule-soft);">
-          <p class="text-[11px] font-semibold mb-1.5" style="color:var(--ink-4);">No device facts — paste manufacturer PDF URL:</p>
+          <p class="ifu-url-label text-[11px] font-semibold mb-1.5" style="color:var(--ink-4);">No device facts — paste manufacturer PDF URL:</p>
           <div class="flex gap-1.5">
             <input type="url" placeholder="https://…/manual.pdf"
               class="ifu-url-input flex-1 text-[12px] px-2.5 py-1.5 rounded-lg outline-none"
@@ -500,10 +500,39 @@
         </div>`;
     }
 
+    // Pre-fill the PDF box from the offline manual library (data/manuals/) so the
+    // clinician doesn't have to go hunting for a manufacturer manual mid-case.
+    async function prefillFromLibrary(form, cardEl) {
+      const mfr   = cardEl.dataset.mfr   || '';
+      const brand = cardEl.dataset.brand || '';
+      if (!mfr && !brand) return;
+      try {
+        const q = new URLSearchParams({ manufacturer: mfr, brand: brand });
+        const res = await fetch('/api/ifu/suggest?' + q);
+        const d = await res.json();
+        if (!d.found) return;
+        const input = form.querySelector('.ifu-url-input');
+        const label = form.querySelector('.ifu-url-label');
+        const msg   = form.querySelector('.ifu-url-msg');
+        if (input && !input.value) input.value = d.url;
+        if (label) label.textContent = 'Manual found in library — press Run to extract:';
+        if (msg) {
+          msg.textContent = '';
+          const a = document.createElement('a');
+          a.href = d.url; a.target = '_blank';
+          a.style.color = 'var(--primary)';
+          a.textContent = d.label + (d.pages ? ` (${d.pages} pp)` : '');
+          msg.appendChild(a);
+        }
+      } catch (e) { /* library is an optimisation; the manual box still works */ }
+    }
+
     function wireIfuForm(form, fhirId, cardEl) {
       const input  = form.querySelector('.ifu-url-input');
       const btn    = form.querySelector('.ifu-url-btn');
       const msg    = form.querySelector('.ifu-url-msg');
+
+      prefillFromLibrary(form, cardEl);
 
       async function submit() {
         const url = (input.value || '').trim();

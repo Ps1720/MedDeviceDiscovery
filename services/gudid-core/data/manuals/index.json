@@ -1,0 +1,219 @@
+{
+  "_comment": "Offline manual library for the demo. Each PDF in this directory was downloaded from the manufacturer (or FDA/FCC) and committed so the IFU pipeline never depends on a third-party site being reachable. fcc.report now 403s every automated request and fccid.io IP-blocks after a handful, which is why the fcc.report URLs in ifu_seed.json no longer resolve. Regenerate with: python scripts/fetch_manuals.py. Matching mirrors ifu_seed.json: manufacturer_pattern must be a substring of the GUDID manufacturer, and one brand_pattern must appear in the brand or model.",
+  "version": "1.0",
+  "retrieved": "2026-09-07",
+  "manuals": [
+    {
+      "file": "medtronic-azure-device-manual.pdf",
+      "label": "Medtronic Azure XT DR MRI SureScan \u2014 Device Manual",
+      "manufacturer_pattern": "medtronic",
+      "brand_patterns": [
+        "azure",
+        "w2dr",
+        "w1dr",
+        "w3dr"
+      ],
+      "category": "pacemaker",
+      "pages": 44,
+      "source_url": "https://fccid.io/LF5BLEIMPLANT/User-Manual/User-Manual-3357083",
+      "source": "FCC filing LF5BLEIMPLANT (via fccid.io)",
+      "notes": "Dual-chamber MR Conditional pacemaker with SureScan. Contains magnet response, MRI conditions, electrocautery guidance.",
+      "priority": 1
+    },
+    {
+      "file": "boston-scientific-resonate-physicians-technical-manual.pdf",
+      "label": "Boston Scientific RESONATE / PERCIVA / CHARISMA ICD \u2014 Physician's Technical Manual",
+      "manufacturer_pattern": "boston",
+      "brand_patterns": [
+        "resonate",
+        "perciva",
+        "charisma",
+        "vigilant",
+        "momentum"
+      ],
+      "category": "icd",
+      "pages": 96,
+      "source_url": "https://www.bostonscientific.com/content/dam/elabeling/crm/51114099-001A_NG4_Tachy_ICD_PTM_en_S.pdf",
+      "source": "Boston Scientific eLabeling",
+      "notes": "Primary clinician manual for the NG4 tachy ICD family.",
+      "priority": 1
+    },
+    {
+      "file": "boston-scientific-imageready-mri-technical-guide.pdf",
+      "label": "Boston Scientific ImageReady MR Conditional Defibrillation System \u2014 MRI Technical Guide",
+      "manufacturer_pattern": "boston",
+      "brand_patterns": [
+        "imageready",
+        "emblem",
+        "dynagen",
+        "inogen",
+        "origen",
+        "autogen"
+      ],
+      "category": "icd",
+      "pages": 50,
+      "source_url": "https://www.bostonscientific.com/content/dam/elabeling/crm/51114107-001A_IMAGEREADY_MRITG_en_S.pdf",
+      "source": "Boston Scientific eLabeling",
+      "notes": "Highest MRI-content density of the Boston Scientific set (0.72 keyword pages/page).",
+      "priority": 1
+    },
+    {
+      "file": "boston-scientific-cied-magnet-response.pdf",
+      "label": "Boston Scientific CIED \u2014 Magnet Response (A Closer Look)",
+      "manufacturer_pattern": "boston",
+      "brand_patterns": [
+        "pacemaker",
+        "icd",
+        "crt",
+        "defibrillator",
+        "accolade",
+        "essentio",
+        "visionist"
+      ],
+      "category": "cied",
+      "pages": 7,
+      "source_url": "https://www.bostonscientific.com/content/dam/bostonscientific/quality/education-resources/english/US_ACL_Magnet%20Use%20with%20BSC%20CIED_20210421.pdf",
+      "source": "Boston Scientific education resources",
+      "notes": "Every page is magnet content \u2014 the cleanest magnet-behaviour source in the library.",
+      "priority": 3
+    },
+    {
+      "file": "abbott-mri-ready-systems-manual.pdf",
+      "label": "Abbott MRI-Ready Systems Manual (Gallant / Ellipse / Assurity / Entrant)",
+      "manufacturer_pattern": "abbott",
+      "brand_patterns": [
+        "gallant",
+        "ellipse",
+        "assurity",
+        "entrant",
+        "neutrino",
+        "fortify",
+        "quadra"
+      ],
+      "category": "icd",
+      "pages": 24,
+      "source_url": "https://manuals.eifu.abbott/content/dam/av/manuals-eifu/global/US/en/ARTEN600263177_A.pdf",
+      "source": "Abbott eIFU",
+      "notes": "MRI procedure information for Abbott MR Conditional systems.",
+      "priority": 1
+    },
+    {
+      "file": "abbott-mri-scan-clinician-checklist.pdf",
+      "label": "Abbott MRI-Ready System \u2014 MRI Scan Clinician Checklist",
+      "manufacturer_pattern": "abbott",
+      "brand_patterns": [
+        "gallant",
+        "entrant",
+        "neutrino",
+        "ellipse"
+      ],
+      "category": "icd",
+      "pages": 2,
+      "source_url": "https://www.cardiovascular.abbott/content/dam/cv/cardiovascular/hcp/products/cardiac-rhythm-management/icd/ellipse-icd/documents/MRI-Ready-System-Checklist-LBBAP-v2.pdf",
+      "source": "Abbott Cardiovascular",
+      "notes": "Two-page peri-scan checklist; useful as a short-document extraction test case.",
+      "priority": 3
+    },
+    {
+      "file": "nevro-senza-hfx-iq-mri-guidelines.pdf",
+      "label": "Nevro Senza HFX iQ SCS \u2014 1.5T & 3T MRI Guidelines",
+      "manufacturer_pattern": "nevro",
+      "brand_patterns": [
+        "senza",
+        "hfx",
+        "ipg2000",
+        "ipg3000"
+      ],
+      "category": "scs",
+      "pages": 32,
+      "source_url": "https://s28.q4cdn.com/260621474/files/doc_downloads/physician_manual/2022/10/10001162-Rev-A-Senza-HFX-iQ-System-1.5T-3T-MRI-Guidelines-(US)_Final.pdf",
+      "source": "Nevro physician manual library",
+      "notes": "MRI conditions for the spinal cord stimulator family.",
+      "priority": 1
+    },
+    {
+      "file": "nevro-senza-physician-implant-manual.pdf",
+      "label": "Nevro Senza SCS \u2014 Physician Implant Manual",
+      "manufacturer_pattern": "nevro",
+      "brand_patterns": [
+        "senza",
+        "hfx"
+      ],
+      "category": "scs",
+      "pages": 31,
+      "source_url": "https://www.accessdata.fda.gov/cdrh_docs/pdf13/P130022d.pdf",
+      "source": "FDA CDRH (PMA P130022)",
+      "notes": "FDA-hosted copy \u2014 authoritative provenance and never bot-blocked.",
+      "priority": 2
+    },
+    {
+      "file": "tandem-tslim-x2-control-iq-user-guide.pdf",
+      "label": "Tandem t:slim X2 with Control-IQ \u2014 User Guide",
+      "manufacturer_pattern": "tandem",
+      "brand_patterns": [
+        "t:slim",
+        "tslim",
+        "control-iq",
+        "x2"
+      ],
+      "category": "closed_loop",
+      "pages": 364,
+      "source_url": "https://www.usmed.com/wp-content/uploads/2025/09/t-slim-X2-Insulin-Pump-with-Control-IQ-Technology-User-Guide.pdf",
+      "source": "Tandem user guide (distributor-hosted mirror)",
+      "notes": "Closed-loop insulin delivery. Electromagnetic-compatibility and MRI/CT/diathermy sections are late in the document (pp. 322-345).",
+      "priority": 1
+    },
+    {
+      "file": "livanova-vns-therapy-physicians-manual.pdf",
+      "label": "LivaNova VNS Therapy System \u2014 Physician's Manual",
+      "manufacturer_pattern": "livanova",
+      "brand_patterns": [
+        "vns",
+        "sentiva",
+        "aspire",
+        "demipulse",
+        "symmetry",
+        "pulse"
+      ],
+      "category": "vns",
+      "pages": 312,
+      "source_url": "http://www.neurosurgeryresident.net/Op.%20Operative%20Techniques/00.%20Catalogs,%20Brochures,%20Manuals/LivaNova/Livanova%20-%20Full%20VNS%20Manual%20(US,%202018-04-01).PDF",
+      "source": "LivaNova VNS Therapy physician manual (2018-04-01)",
+      "notes": "100 keyword pages \u2014 the richest magnet/electrocautery source in the library.",
+      "priority": 1
+    },
+    {
+      "file": "livanova-vns-therapy-mri-guidelines.pdf",
+      "label": "LivaNova VNS Therapy \u2014 MRI Guidelines (HCP)",
+      "manufacturer_pattern": "livanova",
+      "brand_patterns": [
+        "vns",
+        "sentiva",
+        "aspire",
+        "symmetry"
+      ],
+      "category": "vns",
+      "pages": 7,
+      "source_url": "https://www.livanova.com/getcontentasset/11f70fde-4396-4c93-9e9f-fa0c42fdaead/dfc3d011-8f63-43f6-9ed8-4b444333a1d0/mri-guidelines_hcp_2023.pdf",
+      "source": "LivaNova (2023)",
+      "notes": "Every page is MRI content.",
+      "priority": 2
+    },
+    {
+      "file": "livanova-vns-surgical-procedure.pdf",
+      "label": "LivaNova VNS Therapy \u2014 Surgical Procedure for New Implantations",
+      "manufacturer_pattern": "livanova",
+      "brand_patterns": [
+        "vns",
+        "sentiva",
+        "aspire"
+      ],
+      "category": "vns",
+      "pages": 43,
+      "source_url": "https://epilepsy.livanova.com/hubfs/Surgical%20Procedure-New%20Implant%20%20-%20IM-7600387-EPI.pdf",
+      "source": "LivaNova epilepsy portal",
+      "notes": "Intra-operative handling and electrocautery precautions.",
+      "priority": 3
+    }
+  ]
+}

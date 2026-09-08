@@ -17,7 +17,10 @@ import hashlib
 import io
 import json
 import re
+from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import requests
 
@@ -32,6 +35,10 @@ from openai import OpenAI
 
 TIMEOUT = 30
 MAX_CHARS_TO_LLM = 12_000  # keep within token budget
+
+# Offline manual library (see ifu_finder.find_local_manual and app.serve_manual)
+_MANUAL_URL_PREFIX = "/manuals/"
+_MANUAL_DIR = Path(__file__).parent / "data" / "manuals"
 
 # Keywords that flag a page as clinically relevant for perioperative use
 _RELEVANT_KEYWORDS = [
@@ -68,17 +75,51 @@ def _get_llm_client() -> Optional[OpenAI]:
     return OpenAI(api_key=Config.OPENAI_API_KEY, base_url=Config.OPENAI_API_BASE)
 
 
-def _download_pdf(url: str) -> tuple[Optional[bytes], Optional[str]]:
-    """Returns (pdf_bytes, sha256_hex) or (None, None)."""
+def _download_pdf(source: str) -> tuple[Optional[bytes], Optional[str]]:
+    """
+    Load a PDF from an http(s) URL, a file:// URL, or a local filesystem path.
+
+    Local sources matter because the offline manual library (data/manuals/)
+    hands back a path — reading it directly avoids the app having to make an
+    HTTP request to itself, which would need a correct host/port inside Docker.
+
+    Returns (pdf_bytes, sha256_hex) or (None, None).
+    """
     try:
-        resp = requests.get(url, timeout=TIMEOUT, headers={"User-Agent": "PeriopUDI/1.0"})
-        if resp.status_code != 200:
+        if source.startswith("file://"):
+            source = url2pathname(urlparse(source).path)
+
+        # "/manuals/<file>" is how the offline library refers to a manual
+        # everywhere (DB, API, UI links). Resolve it to the file on disk rather
+        # than making the app issue an HTTP request to itself.
+        if source.startswith(_MANUAL_URL_PREFIX):
+            name = source[len(_MANUAL_URL_PREFIX):].split("?")[0]
+            candidate = (_MANUAL_DIR / name).resolve()
+            if candidate.parent != _MANUAL_DIR.resolve() or not candidate.is_file():
+                print(f"[ifu_extractor] manual not in library: {source}")
+                return None, None
+            source = str(candidate)
+
+        if not source.startswith(("http://", "https://")):
+            path = Path(source)
+            if not path.is_file():
+                print(f"[ifu_extractor] local PDF not found: {source}")
+                return None, None
+            content = path.read_bytes()
+        else:
+            resp = requests.get(
+                source, timeout=TIMEOUT, headers={"User-Agent": "PeriopUDI/1.0"}
+            )
+            if resp.status_code != 200:
+                return None, None
+            content = resp.content
+
+        if not content.startswith(b"%PDF"):
+            print(f"[ifu_extractor] not a PDF (got {content[:16]!r}): {source}")
             return None, None
-        content = resp.content
-        sha256 = hashlib.sha256(content).hexdigest()
-        return content, sha256
-    except Exception as exc:
-        print(f"[ifu_extractor] download failed: {exc}")
+        return content, hashlib.sha256(content).hexdigest()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[ifu_extractor] load failed: {exc}")
         return None, None
 
 
