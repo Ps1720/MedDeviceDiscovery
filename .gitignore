@@ -1,5 +1,18 @@
-# Environment variable files
+# Environment variable files — never commit real credentials
 .env
+.env.*
+!.env.example
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Internal working notes (kept locally, not part of the deliverable)
+Build.md
+explanation.md
+project_abstract.md
+Suggestions.md
 
 # Python
 __pycache__/
