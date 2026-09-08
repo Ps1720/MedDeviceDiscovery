@@ -11,7 +11,9 @@ A Flask application that provides:
 STA Engineering Challenge 2026
 """
 
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import (
+    Flask, render_template, request, jsonify, send_file, send_from_directory, abort
+)
 import json
 from pathlib import Path
 
@@ -31,16 +33,53 @@ from scan_to_chart import (
     get_recent_devices,
     delete_device,
     set_implant_site,
+    set_fhir_context,
+    clear_fhir_context,
 )
+from smart_launch import smart_bp, current_smart, session_fhir_context
 import threading
 import overrides as institution_overrides
 import protocol_db
 import protocol_seed
 import protocol_service
 import ifu_pipeline
+import ifu_finder
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# ---- SMART App Launch v2 (Phase 6) ----
+app.register_blueprint(smart_bp)
+
+
+@app.before_request
+def _bind_smart_fhir_context():
+    """When an EHR-launched SMART session is active, route this request's FHIR
+    reads/writes at the launched server with its bearer token; otherwise use the
+    local HAPI server."""
+    try:
+        ctx = session_fhir_context()
+    except Exception as exc:  # noqa: BLE001 - never block a request on this
+        print(f"[smart] context resolution failed: {exc}")
+        ctx = None
+    if ctx:
+        set_fhir_context(ctx[0], ctx[1])
+    else:
+        clear_fhir_context()
+
+
+@app.teardown_request
+def _clear_smart_fhir_context(_exc):
+    clear_fhir_context()
+
+
+@app.context_processor
+def _inject_smart_context():
+    """Expose `smart` (the active SMART session summary, or None) to templates."""
+    try:
+        return {"smart": current_smart()}
+    except Exception:  # noqa: BLE001
+        return {"smart": None}
 
 
 # ============================================
@@ -604,6 +643,56 @@ def api_ifu_extract():
 
     threading.Thread(target=_run, daemon=True).start()
     return jsonify({"started": True})
+
+
+# ============================================
+# OFFLINE MANUAL LIBRARY (data/manuals/)
+# ============================================
+
+@app.route("/manuals/<path:filename>")
+def serve_manual(filename):
+    """
+    Serve a committed manual PDF. These are the demo's offline IFU sources —
+    fcc.report 403s every automated request and fccid.io IP-blocks quickly, so
+    the pipeline reads from here instead of the open web.
+    """
+    manual_dir = (Path(__file__).parent / "data" / "manuals").resolve()
+    # send_from_directory rejects traversal, but resolve+guard the extension too.
+    if not filename.lower().endswith(".pdf"):
+        abort(404)
+    return send_from_directory(manual_dir, filename, mimetype="application/pdf")
+
+
+@app.route("/api/ifu/suggest")
+def api_ifu_suggest():
+    """
+    Best offline manual for a device, so the UI can pre-fill the PDF URL box
+    instead of asking the clinician to go hunting for a manufacturer manual.
+    Query params: manufacturer, brand, model (optional)
+    """
+    hit = ifu_finder.find_local_manual(
+        request.args.get("manufacturer") or "",
+        request.args.get("brand") or "",
+        request.args.get("model") or "",
+    )
+    if not hit:
+        return jsonify({"found": False})
+    return jsonify({
+        "found":      True,
+        "url":        hit["url"],
+        "label":      hit["label"],
+        "file":       hit["file"],
+        "pages":      hit.get("pages"),
+        "category":   hit.get("category"),
+        "source":     hit.get("source"),
+        "source_url": hit.get("source_url"),
+    })
+
+
+@app.route("/api/manuals")
+def api_manuals():
+    """Everything in the offline manual library (tools page / debugging)."""
+    return jsonify({"manuals": ifu_finder.list_local_manuals()})
 
 
 @app.route("/api/ifu/status")

@@ -1,8 +1,8 @@
 """
 Thin FHIR REST client for the local HAPI server.
 
-HAPI is the source of truth for patient/device state (Build.md §2); all device
-reads and writes go through here.
+HAPI is the source of truth for patient/device state; all device reads and
+writes go through here.
 """
 
 from __future__ import annotations
@@ -26,11 +26,20 @@ class FhirError(RuntimeError):
 
 
 class HapiClient:
-    def __init__(self, base_url: str = DEFAULT_BASE_URL, timeout: int = 30):
+    def __init__(
+        self,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout: int = 30,
+        extra_headers: Optional[dict] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"Accept": _JSON})
+        # Used to carry a SMART App Launch bearer token when the app is running
+        # inside an EHR-launched session (see services/gudid-core/smart_launch.py).
+        if extra_headers:
+            self.session.headers.update(extra_headers)
 
     # ---- writes ----
 

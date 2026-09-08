@@ -52,7 +52,11 @@
             <div class="text-[11px]" style="color: var(--ink-3);">Document device to chart</div>
           </div>
         </a>
+        {% if smart %}
+        <a href="/smart/logout" class="text-[13px] font-semibold" style="color: var(--ink-3);">Disconnect EHR</a>
+        {% else %}
         <a href="/patients" class="text-[13px] font-semibold" style="color: var(--ink-3);">All patients →</a>
+        {% endif %}
       </div>
     </header>
 
@@ -63,6 +67,26 @@
             <p class="text-[14px] mt-1" style="color: var(--ink-3);">Scan a UDI, pick a patient, and write a US Core
             Implantable Device to their FHIR chart — with the perioperative protocol for covered device classes.</p>
         </header>
+
+        {% if smart %}
+        <div class="mb-5 rounded-xl px-4 py-3 flex items-center gap-3"
+             style="background: var(--emerald-pale, #f0fdf4); border: 1px solid var(--emerald-deep, #16a34a);">
+            <span style="color: var(--emerald-deep, #16a34a); font-size: 15px;">&#9679;</span>
+            <div class="text-[12px] leading-snug" style="color: var(--ink-2);">
+                <span class="font-semibold">Launched from EHR via SMART App Launch.</span>
+                Writing to <span class="font-mono">{{ smart.iss }}</span>.<br>
+                Patient context:
+                <span class="font-semibold">{{ smart.patient_name }}</span>
+                <span class="font-mono" style="color: var(--ink-4);">({{ smart.patient }})</span>
+                {% if smart.fhir_user %} &middot; user <span class="font-mono">{{ smart.fhir_user }}</span>{% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="mb-5 text-[12px]" style="color: var(--ink-4);">
+            Running against the local HAPI server.
+            <a href="/launch/standalone" class="font-semibold" style="color: var(--primary);">Connect to an EHR (SMART) &rarr;</a>
+        </div>
+        {% endif %}
 
         <div class="surface p-6 space-y-4">
             <div>
@@ -430,6 +454,31 @@
                         const ifuBtn   = document.getElementById('ifu-run-btn');
                         const ifuMsg   = document.getElementById('ifu-url-msg');
                         if (!ifuBtn || !ifuInput) return;
+
+                        // Pre-fill from the offline manual library (data/manuals/)
+                        // so the clinician isn't asked to hunt for a manufacturer PDF.
+                        (async  => {
+                            try {
+                                const q = new URLSearchParams({
+                                    manufacturer: d.manufacturer || '',
+                                    brand: d.brand_name || '',
+                                });
+                                const sr = await fetch('/api/ifu/suggest?' + q);
+                                const sd = await sr.json();
+                                if (!sd.found || ifuInput.value) return;
+                                ifuInput.value = sd.url;
+                                if (ifuMsg) {
+                                    ifuMsg.textContent = '';
+                                    const a = document.createElement('a');
+                                    a.href = sd.url; a.target = '_blank';
+                                    a.style.color = 'var(--primary)';
+                                    a.textContent = 'From library: ' + sd.label
+                                        + (sd.pages ? ` (${sd.pages} pp)` : '');
+                                    ifuMsg.appendChild(a);
+                                }
+                            } catch (e) { /* optimisation only */ }
+                        });
+
                         async function runIfu() {
                             const url = (ifuInput.value || '').trim();
                             if (!url) { if(ifuMsg) { ifuMsg.textContent = 'Paste a PDF URL first.'; ifuMsg.style.color = 'var(--coral-deep)'; } return; }
@@ -486,7 +535,24 @@
         }
 
         btn.addEventListener('click', documentDevice);
-        loadPatients();
+        loadPatients().then(() => {
+            {% if smart and smart.patient %}
+            // SMART App Launch supplied the patient — lock the picker to it.
+            const smartPid  = {{ smart.patient|tojson }};
+            const smartName = {{ smart.patient_name|tojson }};
+            patientSelect.value = smartPid;
+            if (!patientSelect.value) {
+                const opt = document.createElement('option');
+                opt.value = smartPid;
+                opt.textContent = `${smartName} (EHR patient ${smartPid})`;
+                patientSelect.appendChild(opt);
+                patientSelect.value = smartPid;
+            }
+            patientSelect.disabled = true;
+            const hint = document.getElementById('patient-from-chart');
+            if (hint) { hint.textContent = 'set by EHR launch'; hint.classList.remove('hidden'); }
+            {% endif %}
+        });
     </script>
 </body>
 </html>

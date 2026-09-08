@@ -88,6 +88,10 @@ services:
       - FHIR_BASE_URL=http://hapi:8080/fhir
       - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
       - CDS_HOOKS_URL=http://cds-hooks:5001
+      # ---- SMART App Launch v2 ----
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8090}
+      - SMART_CLIENT_ID=${SMART_CLIENT_ID:-periop-udi}
+      - SMART_DEFAULT_ISS=${SMART_DEFAULT_ISS:-https://launch.smarthealthit.org/v/r4/fhir}
     volumes:
       - ./services/gudid-core/static/qr_codes:/app/static/qr_codes
       - ./services/gudid-core/data:/app/data
@@ -114,6 +118,10 @@ services:
       - FHIR_BASE_URL=http://hapi:8080/fhir
       - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
       - CDS_HOOKS_URL=http://cds-hooks:5001
+      # ---- SMART App Launch v2 ----
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8090}
+      - SMART_CLIENT_ID=${SMART_CLIENT_ID:-periop-udi}
+      - SMART_DEFAULT_ISS=${SMART_DEFAULT_ISS:-https://launch.smarthealthit.org/v/r4/fhir}
     volumes:
       - ./services/gudid-core:/app
       - ./services/fhir-bridge/gudid_to_uscore_device.py:/app/gudid_to_uscore_device.py

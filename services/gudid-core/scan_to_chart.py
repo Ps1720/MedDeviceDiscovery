@@ -11,6 +11,7 @@ Also provides the patient-picker feed and the per-patient device timeline.
 
 from __future__ import annotations
 
+import contextvars
 import csv
 import os
 import threading
@@ -51,8 +52,51 @@ _SCAN_LOG_FIELDS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# FHIR target resolution
+#
+# By default every read/write goes to the local HAPI server (FHIR_BASE_URL).
+# When the app is running inside a SMART App Launch session, app.py installs a
+# per-request override here (see smart_launch.session_fhir_context) so the same
+# code talks to the EHR-launched FHIR server with the OAuth2 bearer token.
+# ---------------------------------------------------------------------------
+_fhir_override: contextvars.ContextVar = contextvars.ContextVar(
+    "fhir_override", default=None
+)
+
+
+def set_fhir_context(base_url: str, headers: Optional[dict]) -> None:
+    """Point subsequent FHIR calls in this context at `base_url` with `headers`."""
+    _fhir_override.set({"base": base_url.rstrip("/"), "headers": dict(headers or {})})
+
+
+def clear_fhir_context() -> None:
+    """Revert to the default local-HAPI target."""
+    _fhir_override.set(None)
+
+
+def _fhir_base() -> str:
+    ov = _fhir_override.get()
+    return ov["base"] if ov else FHIR_BASE_URL
+
+
+def _fhir_public_base() -> str:
+    """Browser-reachable base for display links."""
+    ov = _fhir_override.get()
+    return ov["base"] if ov else PUBLIC_FHIR_BASE_URL
+
+
+def _fhir_headers(accept: str = "application/fhir+json") -> dict:
+    ov = _fhir_override.get()
+    headers = {"Accept": accept}
+    if ov:
+        headers.update(ov["headers"])
+    return headers
+
+
 def _client() -> HapiClient:
-    return HapiClient(FHIR_BASE_URL)
+    ov = _fhir_override.get()
+    return HapiClient(_fhir_base(), extra_headers=(ov or {}).get("headers"))
 
 
 def _ifu_already_attempted(manufacturer: str, brand: str) -> bool:
@@ -259,7 +303,7 @@ def document_device(
             "device_id": device_id,
             "device_identifier": di,
             "patient_id": str(patient_id).strip(),
-            "fhir_url": f"{PUBLIC_FHIR_BASE_URL}/Device/{device_id}",
+            "fhir_url": f"{_fhir_public_base()}/Device/{device_id}",
             "brand_name": brand_name,
             "manufacturer": manufacturer,
             "type": record.get("type"),
@@ -330,9 +374,9 @@ def _log_scan(row: dict) -> None:
 def list_patients(limit: int = 50) -> list[dict]:
     """Return patient demographics for the picker table, sorted by name."""
     resp = requests.get(
-        f"{FHIR_BASE_URL}/Patient",
+        f"{_fhir_base()}/Patient",
         params={"_count": limit, "_elements": "name,gender,birthDate,identifier"},
-        headers={"Accept": "application/fhir+json"},
+        headers=_fhir_headers(),
         timeout=20,
     )
     resp.raise_for_status()
@@ -382,8 +426,8 @@ def get_patient_summary(patient_id: str) -> dict:
                "birth_date": None, "age": None, "mrn": None}
     try:
         resp = requests.get(
-            f"{FHIR_BASE_URL}/Patient/{patient_id}",
-            headers={"Accept": "application/fhir+json"},
+            f"{_fhir_base()}/Patient/{patient_id}",
+            headers=_fhir_headers(),
             timeout=15,
         )
         resp.raise_for_status()
@@ -507,8 +551,8 @@ def delete_device(device_id: str) -> bool:
     """Delete a Device from HAPI. Returns True on success."""
     try:
         resp = requests.delete(
-            f"{FHIR_BASE_URL}/Device/{device_id}",
-            headers={"Accept": "application/fhir+json"},
+            f"{_fhir_base()}/Device/{device_id}",
+            headers=_fhir_headers(),
             timeout=15,
         )
         return resp.status_code < 300
@@ -520,9 +564,9 @@ def delete_device(device_id: str) -> bool:
 def get_recent_devices(limit: int = 8) -> list[dict]:
     """Recently documented US Core devices across all patients, newest first."""
     resp = requests.get(
-        f"{FHIR_BASE_URL}/Device",
+        f"{_fhir_base()}/Device",
         params={"_count": 40, "_sort": "-_lastUpdated"},
-        headers={"Accept": "application/fhir+json"},
+        headers=_fhir_headers(),
         timeout=15,
     )
     resp.raise_for_status()
@@ -553,7 +597,10 @@ def get_patient_recall_cards(patient_id: str) -> list[dict]:
                 "hook": "patient-view",
                 "hookInstance": "periopudi-timeline",
                 "context": {"patientId": patient_id},
-                "fhirServer": FHIR_BASE_URL,
+                # Point the recall service at whichever server actually holds this
+                # patient's devices — the local HAPI normally, the EHR-launched
+                # server during a SMART session.
+                "fhirServer": _fhir_base(),
             },
             timeout=15,
         )
@@ -634,5 +681,5 @@ def _simplify_device(device: dict) -> dict:
         "us_core": US_CORE_IMPLANTABLE_DEVICE in profiles,
         "recall_flag": False,  # set True by get_patient_chart when a recall matches
         "recall": None,
-        "fhir_url": f"{PUBLIC_FHIR_BASE_URL}/Device/{device.get('id')}",
+        "fhir_url": f"{_fhir_public_base()}/Device/{device.get('id')}",
     }

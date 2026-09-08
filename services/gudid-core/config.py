@@ -30,7 +30,36 @@ class Config:
     """Flask application configuration."""
     
     # Security
-    # SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    # Signs the Flask session cookie. A stable value is REQUIRED for SMART App
+    # Launch — the OAuth2 state / PKCE verifier / access token live in the
+    # session across the authorize redirect.
+    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+
+    # ---- SMART App Launch v2 (services/gudid-core/smart_launch.py) ----
+    # Public client, PKCE, no secret. Tested against the SMART Health IT
+    # sandbox launcher (https://launch.smarthealthit.org).
+    SMART_CLIENT_ID = os.getenv("SMART_CLIENT_ID", "periop-udi")
+    SMART_SCOPES = os.getenv(
+        "SMART_SCOPES",
+        "launch openid fhirUser profile "
+        "patient/Patient.read patient/Device.read patient/Device.write "
+        "patient/Procedure.read",
+    )
+    # Scopes for a standalone launch (no EHR "launch" param): swap the EHR
+    # "launch" scope for "launch/patient" so the auth server shows a patient picker.
+    SMART_STANDALONE_SCOPES = os.getenv(
+        "SMART_STANDALONE_SCOPES",
+        "launch/patient openid fhirUser profile "
+        "patient/Patient.read patient/Device.read patient/Device.write "
+        "patient/Procedure.read",
+    )
+    # FHIR base used for a standalone launch (the EHR supplies its own on an EHR launch).
+    SMART_DEFAULT_ISS = os.getenv(
+        "SMART_DEFAULT_ISS", "https://launch.smarthealthit.org/v/r4/fhir"
+    )
+    # Public base URL of THIS app, for building the OAuth redirect_uri.
+    APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
+
     
     # OpenAI API Settings
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
