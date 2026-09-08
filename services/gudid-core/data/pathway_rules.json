@@ -1,0 +1,125 @@
+{
+  "_comment": "Perioperative pathway rules for cardiac implantable electronic devices. Kept as data, not code, so clinicians can review and diff them without reading Python. Each rule carries its condition, its output, and the guideline it derives from. Every rule ships requires_verification=true: the originating clinician feedback said 'if surgery expected to extend above the umbilicus and monopolar cautery use expected, then xxxxxx' and left the consequent unspecified, so the text below is a design draft awaiting their sign-off, not clinician-authored content.",
+  "version": "0.1.0",
+  "applies_to_classes": ["pacemaker", "leadless_pacemaker", "icd", "crt_p", "crt_d"],
+
+  "inputs": [
+    {
+      "key": "surgical_site",
+      "question": "Will the surgical field extend above the umbilicus?",
+      "options": [
+        {"value": "above",   "label": "Yes — above umbilicus"},
+        {"value": "below",   "label": "No — below umbilicus"},
+        {"value": "unknown", "label": "Unknown"}
+      ],
+      "default": "unknown",
+      "conservative_value": "above",
+      "unknown_note": "Surgical site not specified — showing the escalated pathway."
+    },
+    {
+      "key": "cautery",
+      "question": "Is monopolar cautery expected?",
+      "options": [
+        {"value": "monopolar", "label": "Yes — monopolar expected"},
+        {"value": "bipolar",   "label": "No — bipolar only"},
+        {"value": "unknown",   "label": "Unknown"}
+      ],
+      "default": "unknown",
+      "conservative_value": "monopolar",
+      "unknown_note": "Cautery modality not specified — assuming monopolar."
+    },
+    {
+      "key": "pacing_dependence",
+      "question": "Is the patient pacing-dependent?",
+      "options": [
+        {"value": "dependent",     "label": "Yes — pacing-dependent"},
+        {"value": "not_dependent", "label": "No — not pacing-dependent"},
+        {"value": "undetermined",  "label": "Not determined"}
+      ],
+      "default": "undetermined",
+      "conservative_value": "undetermined",
+      "never_infer": true,
+      "never_infer_reason": "Pacing dependence must never be inferred from the UDI or from the programmed mode. Devices are commonly programmed to on-demand pacing even in patients with no intrinsic escape rhythm, so an on-demand mode does not exclude dependence.",
+      "unknown_note": "Pacing dependence not determined — treat as potentially dependent."
+    }
+  ],
+
+  "pathways": {
+    "standard": {
+      "label": "Standard",
+      "severity": "info",
+      "summary": "Document the device. No device-specific intervention indicated for this case profile."
+    },
+    "standard_pad": {
+      "label": "Standard, with return-pad precaution",
+      "severity": "info",
+      "summary": "Standard management, plus confirm the dispersive (return) pad is positioned so the current path does not cross the generator or leads."
+    },
+    "standard_watch": {
+      "label": "Standard, modality may change",
+      "severity": "caution",
+      "summary": "Standard management. Bipolar is planned, but confirm with the surgeon that the modality will not change intra-operatively; a switch to monopolar moves this case to the escalated pathway."
+    },
+    "escalated": {
+      "label": "Escalated",
+      "severity": "warning",
+      "summary": "Electromagnetic interference is likely to reach the device. Device-specific mitigation is indicated before incision."
+    }
+  },
+
+  "matrix": [
+    {"site": "below", "cautery": "bipolar",   "pathway": "standard"},
+    {"site": "below", "cautery": "monopolar", "pathway": "standard_pad"},
+    {"site": "above", "cautery": "bipolar",   "pathway": "standard_watch"},
+    {"site": "above", "cautery": "monopolar", "pathway": "escalated"}
+  ],
+
+  "escalated_actions": [
+    {
+      "id": "icd_suspend",
+      "applies_to_classes": ["icd", "crt_d"],
+      "text": "Suspend tachyarrhythmia therapy (magnet or reprogramming) and place external defibrillation pads before incision.",
+      "rationale": "Monopolar cautery can be misinterpreted as a ventricular arrhythmia and provoke an inappropriate shock.",
+      "guideline_source": "HRS/ASA perioperative CIED management",
+      "citation": "Crossley GH et al., Heart Rhythm 2011; ASA Practice Advisory (Anesthesiology, 2020 update)",
+      "requires_verification": true
+    },
+    {
+      "id": "pacemaker_async_dependent",
+      "applies_to_classes": ["pacemaker", "leadless_pacemaker", "crt_p"],
+      "when": {"pacing_dependence": ["dependent", "undetermined"]},
+      "text": "Arrange asynchronous pacing (magnet or reprogramming) per institutional policy.",
+      "rationale": "Oversensing of cautery can inhibit pacing output. Applied when the patient is pacing-dependent, and when dependence has not been determined.",
+      "guideline_source": "HRS/ASA perioperative CIED management",
+      "citation": "Crossley GH et al., Heart Rhythm 2011; ASA Practice Advisory (Anesthesiology, 2020 update)",
+      "requires_verification": true
+    },
+    {
+      "id": "pacemaker_no_async_needed",
+      "applies_to_classes": ["pacemaker", "leadless_pacemaker", "crt_p"],
+      "when": {"pacing_dependence": ["not_dependent"]},
+      "text": "Asynchronous pacing is not routinely required, but keep a magnet immediately available in theatre.",
+      "rationale": "Transient inhibition is tolerated in a patient with an adequate intrinsic rhythm.",
+      "guideline_source": "HRS/ASA perioperative CIED management",
+      "citation": "Crossley GH et al., Heart Rhythm 2011; ASA Practice Advisory (Anesthesiology, 2020 update)",
+      "requires_verification": true
+    },
+    {
+      "id": "return_pad",
+      "applies_to_classes": ["pacemaker", "leadless_pacemaker", "icd", "crt_p", "crt_d"],
+      "text": "Position the dispersive (return) pad so the current path does not cross the generator or leads; keep cautery bursts short.",
+      "guideline_source": "HRS/ASA perioperative CIED management",
+      "citation": "Crossley GH et al., Heart Rhythm 2011; ASA Practice Advisory (Anesthesiology, 2020 update)",
+      "requires_verification": true
+    },
+    {
+      "id": "restore_plan",
+      "applies_to_classes": ["pacemaker", "leadless_pacemaker", "icd", "crt_p", "crt_d"],
+      "text": "Record who restores the original settings post-operatively, and the criteria for post-operative interrogation.",
+      "rationale": "A device left reprogrammed or with therapy suspended is a recognised post-operative hazard.",
+      "guideline_source": "HRS/ASA perioperative CIED management",
+      "citation": "Crossley GH et al., Heart Rhythm 2011; ASA Practice Advisory (Anesthesiology, 2020 update)",
+      "requires_verification": true
+    }
+  ]
+}

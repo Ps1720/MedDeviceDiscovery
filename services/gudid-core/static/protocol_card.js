@@ -92,9 +92,27 @@
     return c ? `<span class="inline-block w-[7px] h-[7px] rounded-full mr-2 align-middle" style="background:${c};"></span>` : '';
   }
 
+  // Seed citations carry two different things behind the same "VERIFY" prefix:
+  //
+  //   "VERIFY: placeholder pending clinician review"  -> no citation exists yet
+  //   "VERIFY against LivaNova physician's manual"    -> the source IS known;
+  //                                                      confirm against it
+  //
+  // Rendered identically they read as "we made all of this up", which is unfair
+  // to content that does have a source. The colon distinguishes them: a
+  // placeholder is dropped (the card already carries one unverified-content
+  // banner), and a real source is shown as the citation it is.
+  function normalizeCitation(raw) {
+    const cit = (raw || '').trim();
+    if (!cit) return '';
+    if (/^VERIFY\s*:/i.test(cit)) return '';                 // placeholder — say nothing
+    return cit.replace(/^VERIFY\s+(exact\s+citation\s*:\s*|against\s+)?/i, '');
+  }
+
   function citeLine(f) {
-    if (!f.guideline_source && !f.citation) return '';
-    const txt = [f.guideline_source, f.citation].filter(Boolean).join(' — ');
+    const cit = normalizeCitation(f.citation);
+    if (!f.guideline_source && !cit) return '';
+    const txt = [f.guideline_source, cit].filter(Boolean).join(' — ');
     return `<p class="text-[11px] mt-1.5" style="color:var(--ink-4);">${esc(txt)}</p>`;
   }
 
@@ -126,6 +144,17 @@
       </div>`).join('');
   }
 
+  // An unconfirmed phone number is worse than no number: a clinician who calls
+  // it at 2am and reaches nothing has lost the time the tool was meant to save.
+  // Every seeded contact is currently hand-entered and unverified, so say so
+  // next to the number rather than presenting it as established fact.
+  function supportCaveatHTML(f) {
+    if (!f || f.requires_verification === false) return '';
+    return `<span class="block text-[11px] mt-1" style="color:var(--honey-deep,#8A6324);">
+              &#9888; Number not yet confirmed — verify before relying on it in a case.
+            </span>`;
+  }
+
   function supportHTML(f, stacked) {
     if (!f) return '';
     const phoneable = /\d/.test(f.value || '');
@@ -138,6 +167,7 @@
           <span class="block text-[11px] font-mono uppercase tracking-[0.1em]" style="color:var(--ink-3);">24-hr support</span>
           <span class="block mt-1">${value}</span>
           ${f.detail ? `<span class="block text-[12px] mt-0.5" style="color:var(--ink-4);">${esc(f.detail)}</span>` : ''}
+          ${supportCaveatHTML(f)}
         </div>`;
     }
     return `
@@ -159,7 +189,11 @@
         <label for="pc-chk-${i}" class="cursor-pointer min-w-0 max-w-[78ch]">
           <span class="block text-[14px] leading-relaxed" style="color:var(--ink);">${esc(it.text)}</span>
           ${it.rationale ? `<span class="block text-[12.5px] leading-relaxed mt-1" style="color:var(--ink-3);">${esc(it.rationale)}</span>` : ''}
-          ${it.guideline_source || it.citation ? `<span class="block text-[11px] mt-1" style="color:var(--ink-4);">${esc([it.guideline_source, it.citation].filter(Boolean).join(' — '))}</span>` : ''}
+          ${(() => {
+            const cit = normalizeCitation(it.citation);
+            const txt = [it.guideline_source, cit].filter(Boolean).join(' — ');
+            return txt ? `<span class="block text-[11px] mt-1" style="color:var(--ink-4);">${esc(txt)}</span>` : '';
+          })()}
         </label>
       </li>`).join('');
     return `${sectionTitle('What to do right now', first)}<ul>${rows}</ul>`;
@@ -314,6 +348,107 @@
       </div>`;
   }
 
+  // ── Case-specific pathway ────────────────────────────────────────────────
+  //
+  // Three case parameters select one pathway. Unanswered questions resolve to
+  // the conservative branch and the assumption is stated, so a missing answer
+  // is never silently read as low risk. Every result shows why it fired, so a
+  // clinician can see which input to correct if the recommendation looks wrong.
+  const PATHWAY_TONE = {
+    info:    { bg: 'var(--emerald-soft,#E2EFE9)', fg: 'var(--emerald-deep,#2E6A55)' },
+    caution: { bg: 'var(--honey-soft,#F7EAD0)',   fg: 'var(--honey-deep,#8A6324)'  },
+    warning: { bg: 'var(--coral-soft,#FAE0D5)',   fg: 'var(--coral-deep,#8E3D24)'  },
+  };
+  const pathwayAnswers = {};
+
+  function pathwayFormHTML(inputs) {
+    const groups = inputs.map(spec => `
+      <div class="mb-3">
+        <p class="text-[12.5px] font-semibold mb-1.5" style="color:var(--ink-2);">${esc(spec.question)}</p>
+        <div class="inline-flex flex-wrap gap-1 p-0.5 rounded-lg" style="background:var(--surface-cool);">
+          ${spec.options.map(o => `
+            <button type="button" class="pc-pw-opt text-[12px] font-semibold px-2.5 py-1 rounded-md"
+                    data-key="${esc(spec.key)}" data-value="${esc(o.value)}"
+                    style="background:${(pathwayAnswers[spec.key] || spec.default) === o.value ? 'var(--surface)' : 'transparent'};
+                           color:${(pathwayAnswers[spec.key] || spec.default) === o.value ? 'var(--ink)' : 'var(--ink-3)'};">
+              ${esc(o.label)}
+            </button>`).join('')}
+        </div>
+        ${spec.never_infer ? `<p class="text-[11px] mt-1" style="color:var(--ink-4);">${esc(spec.never_infer_reason)}</p>` : ''}
+      </div>`).join('');
+    return `<div class="mb-4">${groups}</div>`;
+  }
+
+  function pathwayResultHTML(r) {
+    if (!r || !r.applicable || !r.pathway) return '';
+    const tone = PATHWAY_TONE[r.pathway.severity] || PATHWAY_TONE.info;
+    const actions = (r.actions || []).map(a => `
+      <li class="mb-2">
+        <span class="block text-[13.5px] leading-relaxed" style="color:var(--ink);">${esc(a.text)}</span>
+        ${a.rationale ? `<span class="block text-[12px] mt-0.5" style="color:var(--ink-3);">${esc(a.rationale)}</span>` : ''}
+        ${a.guideline_source ? `<span class="block text-[11px] mt-0.5" style="color:var(--ink-4);">${esc([a.guideline_source, normalizeCitation(a.citation)].filter(Boolean).join(' — '))}</span>` : ''}
+      </li>`).join('');
+    return `
+      <div class="rounded-xl p-4 mb-4" style="background:${tone.bg};border:1px solid ${tone.fg};">
+        <p class="text-[13px] font-bold mb-1" style="color:${tone.fg};">${esc(r.pathway.label)}</p>
+        <p class="text-[12.5px] leading-relaxed mb-2" style="color:var(--ink-2);">${esc(r.pathway.summary || '')}</p>
+        <p class="text-[11.5px]" style="color:var(--ink-3);"><strong>Why:</strong> ${esc(r.because)}</p>
+        ${(r.assumptions || []).map(a =>
+          `<p class="text-[11.5px] mt-1" style="color:${tone.fg};">&#9888; ${esc(a)}</p>`).join('')}
+        ${actions ? `<ul class="mt-3 mb-0 pl-0" style="list-style:none;">${actions}</ul>` : ''}
+      </div>`;
+  }
+
+  async function refreshPathway(container, classKey) {
+    const box = container.querySelector('#pc-pathway-result');
+    if (!box) return;
+    try {
+      const q = new URLSearchParams({ class_key: classKey, ...pathwayAnswers });
+      const res = await fetch('/api/pathway?' + q);
+      box.innerHTML = pathwayResultHTML(await res.json());
+    } catch (e) {
+      box.innerHTML = '';
+    }
+  }
+
+  async function mountPathway(container, protocol) {
+    const classKey = protocol.device_class;
+    if (!classKey) return;
+    let spec;
+    try {
+      const res = await fetch('/api/pathway/inputs');
+      spec = await res.json();
+    } catch (e) { return; }
+    if (!(spec.applies_to_classes || []).includes(classKey)) return;
+
+    const host = document.createElement('div');
+    host.className = 'mb-5';
+    host.innerHTML = `
+      ${sectionTitle('This case')}
+      <p class="text-[12px] mb-3" style="color:var(--ink-3);">
+        Answer three questions to narrow the guidance to this case. Unanswered
+        questions fall to the more cautious pathway.
+      </p>
+      ${pathwayFormHTML(spec.inputs)}
+      <div id="pc-pathway-result"></div>`;
+
+    const checklist = container.querySelector('ul');
+    (checklist ? checklist.parentNode : container).insertBefore(host, checklist || null);
+
+    host.querySelectorAll('.pc-pw-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pathwayAnswers[btn.dataset.key] = btn.dataset.value;
+        host.querySelectorAll(`.pc-pw-opt[data-key="${btn.dataset.key}"]`).forEach(b => {
+          const on = b === btn;
+          b.style.background = on ? 'var(--surface)' : 'transparent';
+          b.style.color = on ? 'var(--ink)' : 'var(--ink-3)';
+        });
+        refreshPathway(container, classKey);
+      });
+    });
+    refreshPathway(container, classKey);
+  }
+
   async function switchContext(container, di, context) {
     try {
       const res = await fetch(`/api/protocol/by-di/${encodeURIComponent(di)}?context=${encodeURIComponent(context)}`);
@@ -345,6 +480,8 @@
         }
       });
     });
+    // Case-specific pathway, for the cardiac classes the rules cover.
+    mountPathway(container, protocol);
   }
 
   window.renderProtocolPanel = renderProtocolPanel;
