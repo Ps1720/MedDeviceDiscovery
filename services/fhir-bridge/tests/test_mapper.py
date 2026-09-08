@@ -96,11 +96,15 @@ def test_gmdn_becomes_device_type_coding():
     assert coding["code"] == "58513"
 
 
-def test_production_identifiers_passthrough_and_override():
-    # GUDID-record values are used by default...
+def test_production_identifiers_come_only_from_the_scan():
+    """
+    Production identifiers exist on the physical package, not in GUDID. A DI-only
+    lookup must therefore omit them entirely; only a scanned UDI supplies them.
+    """
     dev = map_to_device(SAMPLE_RECORDS["pacemaker"])
-    assert dev["serialNumber"] == "PJN123456"
-    # ...and scan-supplied overrides win.
+    assert "serialNumber" not in dev
+    assert "lotNumber" not in dev
+
     dev2 = map_to_device(
         SAMPLE_RECORDS["pacemaker"], serial_number="OVERRIDE-9", lot_number="L9"
     )
@@ -108,11 +112,35 @@ def test_production_identifiers_passthrough_and_override():
     assert dev2["lotNumber"] == "L9"
 
 
+def test_gudid_boolean_flags_never_become_identifiers():
+    """
+    Regression: GUDID returns lotBatch / serialNumber / expirationDate /
+    manufacturingDate as BOOLEAN FLAGS ("does this device carry one?"). Reading
+    them as values wrote serialNumber="True", lotNumber="False" onto every
+    mapped Device — schema-valid, clinically meaningless.
+    """
+    record = {
+        **SAMPLE_RECORDS["pacemaker"],
+        "serial_number": True,
+        "lot_batch": False,
+        "expiration_date": False,
+        "manufacturing_date": False,
+    }
+    dev = map_to_device(record)
+    for field in ("serialNumber", "lotNumber", "expirationDate", "manufactureDate"):
+        assert dev.get(field) not in ("True", "False", True, False), (
+            f"{field} picked up a GUDID boolean flag: {dev.get(field)!r}"
+        )
+
+
 def test_dates_normalized_to_fhir():
-    dev = map_to_device(SAMPLE_RECORDS["neurostimulator"])
+    # Dates, like other production identifiers, arrive from the scanned UDI.
+    dev = map_to_device(
+        SAMPLE_RECORDS["neurostimulator"], manufacture_date="2025-02-15T00:00:00Z"
+    )
     # trailing time is trimmed to a valid FHIR date
     assert dev["manufactureDate"] == "2025-02-15"
-    dev_partial = map_to_device(SAMPLE_RECORDS["hip_implant"])
+    dev_partial = map_to_device(SAMPLE_RECORDS["hip_implant"], expiration_date="2030-01")
     assert dev_partial["expirationDate"] == "2030-01"
 
 

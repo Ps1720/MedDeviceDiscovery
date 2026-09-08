@@ -23,7 +23,6 @@
     {
       "file": "boston-scientific-resonate-physicians-technical-manual.pdf",
       "label": "Boston Scientific RESONATE / PERCIVA / CHARISMA ICD \u2014 Physician's Technical Manual",
-      "manufacturer_pattern": "boston",
       "brand_patterns": [
         "resonate",
         "perciva",
@@ -36,12 +35,15 @@
       "source_url": "https://www.bostonscientific.com/content/dam/elabeling/crm/51114099-001A_NG4_Tachy_ICD_PTM_en_S.pdf",
       "source": "Boston Scientific eLabeling",
       "notes": "Primary clinician manual for the NG4 tachy ICD family.",
-      "priority": 1
+      "priority": 1,
+      "manufacturer_patterns": [
+        "boston",
+        "guidant"
+      ]
     },
     {
       "file": "boston-scientific-imageready-mri-technical-guide.pdf",
       "label": "Boston Scientific ImageReady MR Conditional Defibrillation System \u2014 MRI Technical Guide",
-      "manufacturer_pattern": "boston",
       "brand_patterns": [
         "imageready",
         "emblem",
@@ -55,12 +57,15 @@
       "source_url": "https://www.bostonscientific.com/content/dam/elabeling/crm/51114107-001A_IMAGEREADY_MRITG_en_S.pdf",
       "source": "Boston Scientific eLabeling",
       "notes": "Highest MRI-content density of the Boston Scientific set (0.72 keyword pages/page).",
-      "priority": 1
+      "priority": 1,
+      "manufacturer_patterns": [
+        "boston",
+        "guidant"
+      ]
     },
     {
       "file": "boston-scientific-cied-magnet-response.pdf",
       "label": "Boston Scientific CIED \u2014 Magnet Response (A Closer Look)",
-      "manufacturer_pattern": "boston",
       "brand_patterns": [
         "pacemaker",
         "icd",
@@ -75,12 +80,15 @@
       "source_url": "https://www.bostonscientific.com/content/dam/bostonscientific/quality/education-resources/english/US_ACL_Magnet%20Use%20with%20BSC%20CIED_20210421.pdf",
       "source": "Boston Scientific education resources",
       "notes": "Every page is magnet content \u2014 the cleanest magnet-behaviour source in the library.",
-      "priority": 3
+      "priority": 3,
+      "manufacturer_patterns": [
+        "boston",
+        "guidant"
+      ]
     },
     {
       "file": "abbott-mri-ready-systems-manual.pdf",
       "label": "Abbott MRI-Ready Systems Manual (Gallant / Ellipse / Assurity / Entrant)",
-      "manufacturer_pattern": "abbott",
       "brand_patterns": [
         "gallant",
         "ellipse",
@@ -95,12 +103,17 @@
       "source_url": "https://manuals.eifu.abbott/content/dam/av/manuals-eifu/global/US/en/ARTEN600263177_A.pdf",
       "source": "Abbott eIFU",
       "notes": "MRI procedure information for Abbott MR Conditional systems.",
-      "priority": 1
+      "priority": 1,
+      "manufacturer_patterns": [
+        "abbott",
+        "st. jude",
+        "st jude",
+        "sjm"
+      ]
     },
     {
       "file": "abbott-mri-scan-clinician-checklist.pdf",
       "label": "Abbott MRI-Ready System \u2014 MRI Scan Clinician Checklist",
-      "manufacturer_pattern": "abbott",
       "brand_patterns": [
         "gallant",
         "entrant",
@@ -112,7 +125,13 @@
       "source_url": "https://www.cardiovascular.abbott/content/dam/cv/cardiovascular/hcp/products/cardiac-rhythm-management/icd/ellipse-icd/documents/MRI-Ready-System-Checklist-LBBAP-v2.pdf",
       "source": "Abbott Cardiovascular",
       "notes": "Two-page peri-scan checklist; useful as a short-document extraction test case.",
-      "priority": 3
+      "priority": 3,
+      "manufacturer_patterns": [
+        "abbott",
+        "st. jude",
+        "st jude",
+        "sjm"
+      ]
     },
     {
       "file": "nevro-senza-hfx-iq-mri-guidelines.pdf",

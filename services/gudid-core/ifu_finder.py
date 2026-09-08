@@ -93,8 +93,18 @@ def _load_manuals() -> list[dict]:
 
 
 def _matches(entry: dict, mfr_l: str, brand_l: str, model_l: str) -> bool:
-    """Shared matcher: manufacturer substring + any brand pattern in brand/model."""
-    if entry.get("manufacturer_pattern", "") not in mfr_l:
+    """
+    Shared matcher: any manufacturer pattern + any brand pattern in brand/model.
+
+    Manufacturer accepts a list because GUDID records carry the name registered
+    at the time of listing, which is often a company since acquired — Abbott's
+    cardiac rhythm devices are still filed under "ST. JUDE MEDICAL, INC.". An
+    entry may use `manufacturer_patterns` (list) or `manufacturer_pattern` (str).
+    """
+    patterns = entry.get("manufacturer_patterns") or [
+        entry.get("manufacturer_pattern", "")
+    ]
+    if not any(p and p in mfr_l for p in patterns):
         return False
     return any(
         bp in brand_l or bp in model_l

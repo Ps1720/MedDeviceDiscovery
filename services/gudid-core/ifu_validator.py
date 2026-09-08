@@ -79,11 +79,22 @@ def validate(
     confidence_deductions = 0.0
 
     if not facts:
+        # Nothing was extracted. This is NOT a conflict.
+        #
+        # A conflict means the manual and GUDID actively disagree, which is a
+        # safety signal that suppresses display of the extracted facts. "Found
+        # nothing" is simply an empty result — there is nothing to suppress.
+        #
+        # Reporting it as a conflict made ifu_store's `no_facts` status
+        # unreachable (it only applies when `conflicts` is empty), so devices
+        # whose manual could not be located were recorded as conflicts. That
+        # made conflict suppression look like it fired constantly when in fact
+        # it had never fired at all.
         return {
             "valid": False,
             "confidence": 0.0,
-            "conflicts": ["No extracted facts to validate"],
-            "warnings": [],
+            "conflicts": [],
+            "warnings": ["No extracted facts to validate"],
         }
 
     # ── MRI safety cross-check ──────────────────────────────────────────────

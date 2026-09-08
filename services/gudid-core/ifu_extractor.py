@@ -40,13 +40,41 @@ MAX_CHARS_TO_LLM = 12_000  # keep within token budget
 _MANUAL_URL_PREFIX = "/manuals/"
 _MANUAL_DIR = Path(__file__).parent / "data" / "manuals"
 
-# Keywords that flag a page as clinically relevant for perioperative use
-_RELEVANT_KEYWORDS = [
-    "magnet", "asynchronous", "asynch", "electrocautery", "cautery",
-    "electromagnetic", "interference", "mri", "magnetic resonance",
-    "support", "helpline", "technical support", "phone",
-    "defibrillation", "therapy", "inhibit", "suspend",
-]
+# Keywords that mark a page as clinically relevant, weighted by how strongly
+# each one predicts the facts we actually want.
+#
+# Weighting matters because pages are ranked, not taken in document order. Terms
+# like "therapy" and "support" appear on nearly every page of a device manual —
+# used as a plain filter they matched 212 of 312 pages of the LivaNova manual,
+# which is no filter at all. They stay, but score close to nothing.
+_KEYWORD_WEIGHTS = {
+    # the facts we are extracting
+    "magnet rate": 12.0, "magnet mode": 10.0, "magnet response": 10.0,
+    "asynchronous": 8.0, "asynch": 6.0,
+    "electrocautery": 10.0, "cautery": 8.0, "diathermy": 8.0,
+    "magnetic resonance": 8.0, "mri": 6.0, "mr conditional": 10.0,
+    "tesla": 6.0, "sar": 3.0, "gauss": 6.0,
+    "electromagnetic interference": 8.0, "electromagnetic": 4.0,
+    "bpm": 5.0, "beats per minute": 5.0,
+    "24-hour": 5.0, "24 hour": 5.0, "1-800": 6.0, "1-866": 6.0, "1-877": 6.0,
+    # weak signals — kept for recall, scored low so they cannot dominate
+    "interference": 2.0, "inhibit": 2.0, "suspend": 2.0,
+    "defibrillation": 2.0, "helpline": 3.0, "technical support": 2.0,
+    "phone": 1.0, "support": 0.5, "therapy": 0.2,
+}
+
+# Retained for callers/tests that just want the term list.
+_RELEVANT_KEYWORDS = list(_KEYWORD_WEIGHTS)
+
+# Pages shorter than this are almost always contents entries or running headers.
+_MIN_PAGE_CHARS = 220
+
+# A pacing rate stated with its unit. Manufacturers are inconsistent: Medtronic
+# writes "65 min-1", others "85 bpm", "100 ppm" or "beats per minute".
+_RATE_PATTERN = re.compile(
+    r"\b\d{2,3}\s*(?:min\s*[-–−]?\s*1|min⁻¹|bpm|ppm|beats\s*/?\s*min|beats per minute)",
+    re.I,
+)
 
 _EXTRACTION_PROMPT = """You are a medical-device IFU parser. Extract perioperative-relevant facts from the text below.
 
@@ -125,30 +153,164 @@ def _download_pdf(source: str) -> tuple[Optional[bytes], Optional[str]]:
 
 def _extract_relevant_text(pdf_bytes: bytes) -> str:
     """
-    Parse PDF and return text from pages that contain clinically relevant keywords.
-    Falls back to full text if no keyword pages found.
+    Return the most clinically relevant text from the PDF, within the token budget.
+
+    Pages are RANKED by weighted keyword score, not taken in document order.
+    Document order fails badly on long manuals: the LivaNova VNS physician's
+    manual has 212 keyword-matching pages out of 312, so an in-order scan spent
+    the entire 12,000-character budget on the title page and table of contents
+    and the model saw no magnet rate, no MRI conditions and no support number.
+
+    Selected pages are re-sorted into document order before joining, so the
+    model still reads them in their natural sequence.
     """
     if not _PDF_AVAILABLE:
         raise RuntimeError(
             "pdfplumber is not installed. Run: pip install pdfplumber"
         )
 
-    relevant_pages: list[str] = []
-    all_pages: list[str] = []
-
+    pages: list[tuple[int, str]] = []
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text() or ""
-            all_pages.append(text)
-            lower = text.lower()
-            if any(kw in lower for kw in _RELEVANT_KEYWORDS):
-                relevant_pages.append(text)
+        for idx, page in enumerate(pdf.pages):
+            pages.append((idx, page.extract_text() or ""))
 
-    chosen = relevant_pages if relevant_pages else all_pages
-    combined = "\n\n".join(chosen)
-    # Collapse excessive whitespace and trim to budget
+    def score(text: str) -> float:
+        low = text.lower()
+        if len(low) < _MIN_PAGE_CHARS:
+            return 0.0          # contents entries, running headers, blank pages
+        total = 0.0
+        for kw, weight in _KEYWORD_WEIGHTS.items():
+            hits = low.count(kw)
+            if hits:
+                # diminishing returns: a page repeating one term is not better
+                # than a page covering several
+                total += weight * (1 + min(hits - 1, 3) * 0.35)
+
+        # A page stating an actual pacing rate is the single most valuable page
+        # in the document, and keyword counting alone does not find it: the
+        # Medtronic Azure manual writes "65 min-1", never "bpm", so the page
+        # carrying the magnet rate ranked 7th and fell outside the budget.
+        # Reward a number adjacent to any rate unit, and reward it more when
+        # "magnet" appears on the same page.
+        if _RATE_PATTERN.search(low):
+            total += 25.0 if "magnet" in low else 10.0
+
+        # normalise by length so a dense half-page beats a sprawling one
+        return total / (1 + len(low) / 4000.0)
+
+    ranked = sorted(
+        ((score(t), i, t) for i, t in pages if t.strip()),
+        key=lambda r: -r[0],
+    )
+    scored = [r for r in ranked if r[0] > 0]
+    if not scored:
+        scored = ranked  # nothing matched — fall back to whatever the PDF has
+
+    # Take highest-scoring pages until the budget is spent, then restore order.
+    picked: list[tuple[int, str]] = []
+    used = 0
+    for s, i, text in scored:
+        if used + len(text) > MAX_CHARS_TO_LLM and picked:
+            continue          # skip this one, a shorter page may still fit
+        picked.append((i, text))
+        used += len(text) + 2
+        if used >= MAX_CHARS_TO_LLM:
+            break
+
+    picked.sort(key=lambda p: p[0])
+    combined = "\n\n".join(t for _, t in picked)
     combined = re.sub(r"\n{3,}", "\n\n", combined)
     return combined[:MAX_CHARS_TO_LLM]
+
+
+# Evidence each fact must be able to point at in the source text before it may
+# be stored and badged "Extracted from IFU".
+#
+# This exists because the model fabricated a clinically plausible electrocautery
+# recommendation for the Medtronic Azure manual — a document containing zero
+# occurrences of "electrocautery", "cautery" or "tachytherapy" — and it was
+# stored with manufacturer attribution alongside genuinely extracted facts. A
+# fabricated fact sitting next to true ones inherits their credibility, which is
+# precisely the failure mode a clinician cannot detect.
+#
+# Each entry lists substrings, ANY of which must appear in the source text for
+# the fact to be considered grounded.
+# Keyed by BOTH the LLM's extraction key and the stored brand_facts key
+# (ifu_store._FACT_KEY_MAP renames them on the way in), so the same rules apply
+# whether checking fresh output or auditing what is already in the database.
+_REQUIRED_EVIDENCE = {
+    # extraction keys
+    "electrocautery_recommendation": ("cauter", "electrosurg", "diathermy", "esu"),
+    "em_interference_notes":         ("electromagnetic", "emi", "interference"),
+    "mri_conditional":               ("mri", "magnetic resonance", "mr conditional"),
+    "mri_conditions_summary":        ("mri", "magnetic resonance", "mr conditional"),
+    "magnet_mode":                   ("magnet",),
+    "magnet_response_programmable_off": ("magnet",),
+    "magnet_inhibits_tachy_therapy": ("magnet",),
+    "magnet_rate_bpm":               ("magnet",),
+    # stored keys
+    "electrocautery":                ("cauter", "electrosurg", "diathermy", "esu"),
+    "em_interference":               ("electromagnetic", "emi", "interference"),
+    "mri_conditions":                ("mri", "magnetic resonance", "mr conditional"),
+    "magnet_programmable_off":       ("magnet",),
+    "magnet_inhibits_therapy":       ("magnet",),
+    "magnet_rate":                   ("magnet",),
+}
+
+# Fact keys whose value is a number that must appear verbatim in the source.
+_NUMERIC_EVIDENCE_KEYS = (
+    "magnet_rate_bpm", "magnet_rate", "support_phone_24hr", "support_phone",
+)
+
+
+def _is_grounded(key: str, value, source_text: str) -> bool:
+    """
+    True when `value` is actually supported by the source document.
+
+    Numbers must appear verbatim; free-text facts must be accompanied by at
+    least one of the domain terms the claim depends on. A fact that cannot point
+    at its evidence is dropped rather than stored with a false citation.
+    """
+    if value is None or value == "":
+        return True                      # nothing claimed, nothing to ground
+    low = source_text.lower()
+
+    # Numeric claims (magnet rate, phone number): the digits must be present.
+    digits = re.findall(r"\d[\d\-\.]{1,}", str(value))
+    if digits and key in _NUMERIC_EVIDENCE_KEYS:
+        core = max(digits, key=len).replace("-", "").replace(".", "")
+        stripped = re.sub(r"[^0-9]", "", low)
+        return core in stripped
+
+    needles = _REQUIRED_EVIDENCE.get(key)
+    if not needles:
+        return True                      # no evidence rule defined for this key
+
+    # Short needles are abbreviations and must match whole words. As bare
+    # substrings they produce false evidence: "esu" matches "result"/"resume",
+    # "emi" matches "chemistry" — which is how a fabricated electrocautery
+    # recommendation was accepted as grounded in a manual that never mentions
+    # cautery at all.
+    for n in needles:
+        if len(n) <= 4:
+            if re.search(rf"\b{re.escape(n)}\b", low):
+                return True
+        elif n in low:
+            return True
+    return False
+
+
+def _drop_ungrounded(facts: dict, source_text: str) -> tuple[dict, list[str]]:
+    """Remove facts the source text does not support. Returns (kept, dropped)."""
+    kept, dropped = {}, []
+    for key, value in (facts or {}).items():
+        if _is_grounded(key, value, source_text):
+            kept[key] = value
+        else:
+            dropped.append(key)
+            print(f"[ifu_extractor] DROPPED ungrounded {key}={str(value)[:60]!r} "
+                  f"— no supporting evidence in the source document")
+    return kept, dropped
 
 
 def _call_llm(text: str) -> Optional[dict]:
@@ -229,7 +391,11 @@ def extract_from_url(url: str) -> dict:
                 "error": "No text extracted from PDF"}
 
     facts = _call_llm(text)
+    dropped: list[str] = []
+    if facts:
+        facts, dropped = _drop_ungrounded(facts, text)
     return {
+        "ungrounded_dropped": dropped,
         "url": url,
         "ifu_hash": ifu_hash,
         "text_chars": len(text),

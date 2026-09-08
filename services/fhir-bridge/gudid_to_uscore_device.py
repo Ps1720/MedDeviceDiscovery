@@ -119,23 +119,26 @@ def map_to_device(
     device["udiCarrier"] = [udi_carrier]
 
     # ---- Production identifiers ----
-    serial = _clean(serial_number) or _clean(gudid_record.get("serial_number"))
+    #
+    # These come ONLY from the scanned UDI. GUDID's lotBatch / serialNumber /
+    # expirationDate / manufacturingDate fields are boolean flags describing
+    # whether a device carries such an identifier — not the identifier itself.
+    # Falling back to them produced serialNumber="True" and lotNumber="False"
+    # on every mapped Device. A device identifier (DI) alone carries no
+    # production identifiers; absent a full UDI scan these are correctly omitted.
+    serial = _clean(serial_number)
     if serial:
         device["serialNumber"] = serial
 
-    lot = _clean(lot_number) or _clean(gudid_record.get("lot_batch"))
+    lot = _clean(lot_number)
     if lot:
         device["lotNumber"] = lot
 
-    expiry = _as_fhir_datetime(expiration_date) or _as_fhir_datetime(
-        gudid_record.get("expiration_date")
-    )
+    expiry = _as_fhir_datetime(expiration_date)
     if expiry:
         device["expirationDate"] = expiry
 
-    mfg_date = _as_fhir_datetime(manufacture_date) or _as_fhir_datetime(
-        gudid_record.get("manufacturing_date")
-    )
+    mfg_date = _as_fhir_datetime(manufacture_date)
     if mfg_date:
         device["manufactureDate"] = mfg_date
 

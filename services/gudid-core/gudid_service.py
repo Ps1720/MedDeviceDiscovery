@@ -320,6 +320,24 @@ def _search_openfda_udi(query: str, limit: int = 10) -> Dict[str, Any]:
     return {"results": results, "totalCount": total}
 
 
+def _as_bool(value: Any) -> Optional[bool]:
+    """
+    Normalise a GUDID boolean flag. The API returns these as real booleans in
+    some records and as the strings "true"/"false" in others.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ("true", "yes", "y", "1"):
+            return True
+        if v in ("false", "no", "n", "0"):
+            return False
+    return None
+
+
 def extract_device_info(gudid_response: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract relevant device information from GUDID API response.
@@ -461,10 +479,16 @@ def extract_device_info(gudid_response: Dict[str, Any]) -> Dict[str, Any]:
             
             # Device characteristics
             "device_count": device.get("deviceCount"),
-            "lot_batch": device.get("lotBatch"),
-            "serial_number": device.get("serialNumber"),
-            "expiration_date": device.get("expirationDate"),
-            "manufacturing_date": device.get("manufacturingDate"),
+            # GUDID's lotBatch / serialNumber / expirationDate / manufacturingDate
+            # are BOOLEAN FLAGS — "does this device carry a lot number?" — not the
+            # values themselves. The values are production identifiers that only
+            # exist on the physical package and come from parsing the scanned UDI.
+            # Reading them as values wrote serialNumber="True", lotNumber="False"
+            # into every Device resource. Keep them, but named as the flags they are.
+            "has_lot_batch": _as_bool(device.get("lotBatch")),
+            "has_serial_number": _as_bool(device.get("serialNumber")),
+            "has_expiration_date": _as_bool(device.get("expirationDate")),
+            "has_manufacturing_date": _as_bool(device.get("manufacturingDate")),
             "combination_product": device.get("deviceCombinationProduct"),
             
             # Additional information

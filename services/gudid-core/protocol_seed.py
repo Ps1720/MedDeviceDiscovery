@@ -26,7 +26,7 @@ from typing import Optional
 import protocol_db
 import device_class_resolver
 
-SEED_VERSION = "2026.06.2"
+SEED_VERSION = "2026.09.1"
 
 _VERIFY = "VERIFY: placeholder pending clinician review"
 
@@ -175,8 +175,8 @@ PROTOCOL_FACTS = [
      "Magnet rate varies by manufacturer and battery status (see brand info). Removing the magnet restores the programmed mode. Response can be programmed off in some devices — confirm at interrogation.",
      "caution", _HRS_ASA, "2011/2020", _HRS_ASA_CIT),
     ("pacemaker", "all", "pacer_dependence",
-     "Pacing dependence CANNOT be determined from the UDI. Check the most recent device interrogation or EP note.",
-     "If the patient is pacing-dependent and significant electromagnetic interference is expected (e.g. monopolar cautery above the umbilicus), plan asynchronous pacing (magnet or reprogramming) per institutional policy.",
+     "Pacing dependence CANNOT be determined from the UDI, and is not settled by the programmed mode either. Check the most recent interrogation or EP note, and confirm clinically.",
+     "Devices are commonly programmed to on-demand pacing even in patients with no intrinsic escape rhythm, so an on-demand mode does not exclude dependence. Where dependence is not established and significant electromagnetic interference is expected (e.g. monopolar cautery above the umbilicus), treat the patient as potentially dependent and plan asynchronous pacing per institutional policy.",
      "critical", _HRS_ASA, "2011/2020", _HRS_ASA_CIT),
     ("pacemaker", "surgery", "electrocautery",
      "Prefer bipolar electrocautery. If monopolar is required, use short irregular bursts and place the dispersive electrode so the current path avoids the generator and leads.",
@@ -707,7 +707,18 @@ def seed_protocols(db_path: Optional[Path] = None, force: bool = False) -> bool:
 
         with conn:  # single transaction
             for table in protocol_db.CONTENT_TABLES:
-                conn.execute(f"DELETE FROM {table}")
+                if table == "brand_facts":
+                    # Only the seeded rows. Facts extracted from manufacturer
+                    # manuals by the IFU pipeline are NOT seed data: they have
+                    # their own provenance, cost an LLM call to produce, and are
+                    # device-specific where seed rows are manufacturer-generic.
+                    # Wiping them to refresh guideline content silently discarded
+                    # them — e.g. the Azure's extracted 65 min-1 magnet rate,
+                    # leaving the generic Medtronic 85 bpm showing in its place,
+                    # which the Azure manual explicitly contradicts.
+                    conn.execute("DELETE FROM brand_facts WHERE source != 'llm'")
+                else:
+                    conn.execute(f"DELETE FROM {table}")
             conn.executemany(
                 "INSERT INTO device_classes (class_key, display_name, module, description) "
                 "VALUES (?, ?, ?, ?)",
