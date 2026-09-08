@@ -1,10 +1,101 @@
 # PeriopUDI Changelog
 
-All notable changes to the PeriopUDI project are documented in this file. This changelog tracks implementation progress through the 10-phase build plan outlined in Build.md.
+All notable changes to the PeriopUDI project are documented in this file. This changelog tracks implementation progress phase by phase.
 
 ---
 
 ## [Unreleased]
+
+---
+
+### Added — Offline manual library; IFU finding no longer depends on the open web (2026-09-07)
+
+**The curated IFU path was silently broken.** Every `ifu_url` in `data/ifu_seed.json`
+points at fcc.report, and fcc.report now returns **403 to every automated request**
+(verified: all 12 direct PDF URLs). The fccid.io mirror serves, but IP-blocks after
+roughly six fetches. So the "zero-API-key IFU finding for 13 device families" claimed
+on 2026-06-24 no longer worked at all.
+
+Fixed by committing the manuals to the repo:
+
+- **`services/gudid-core/data/manuals/`** — 12 clinician-facing PDFs (~27 MB), each
+  downloaded from the manufacturer, FDA CDRH, or an FCC filing, with `index.json`
+  recording label, brand-match patterns, category, page count, `source_url` and
+  provenance note. Covers Medtronic Azure, Boston Scientific RESONATE ICD /
+  ImageReady MRI / CIED magnet response, Abbott MRI-Ready + scan checklist,
+  Nevro Senza HFX (MRI guidelines + implant manual), Tandem t:slim X2 Control-IQ,
+  and LivaNova VNS (physician's manual + MRI guidelines + surgical procedure).
+- **`ifu_finder`** — new Step -1 `_try_local` ahead of the curated seed, plus
+  `find_local_manual` / `list_local_manuals`. Ranking is by an explicit
+  `priority` field (1 = primary clinician manual, 3 = supplement) so a 2-page
+  checklist can't beat the 312-page physician's manual just by matching a longer
+  brand string.
+- **`ifu_extractor._download_pdf`** — now accepts a local path, a `file://` URL, or
+  the canonical `/manuals/<file>` form, resolving the last against the library
+  directory (with a traversal guard) instead of making the app HTTP-request itself.
+  Also rejects non-PDF payloads up front, which is what a 403 HTML error page is.
+- **Routes** — `GET /manuals/<file>` serves a manual (PDF-only, traversal-guarded),
+  `GET /api/ifu/suggest?manufacturer=&brand=` returns the best library match, and
+  `GET /api/manuals` lists the library.
+- **UI** — the "paste manufacturer PDF URL" box on both the patient timeline and the
+  scan-to-chart result now **pre-fills from the library** and links the matched manual
+  by name and page count, instead of asking a clinician to go hunting mid-case.
+- **`scripts/fetch_manuals.py`** — `--list`, `--verify` (opens every PDF, checks page
+  counts), and a re-download mode driven by `index.json`. Hosts known to block bots are
+  named explicitly rather than retried.
+
+Verified: all 12 PDFs open with the expected page counts; `/manuals/` rejects
+traversal, non-PDF and missing files (404); extraction from the local Boston Scientific
+magnet document yields 47 magnet references in the LLM-bound text.
+
+---
+
+### Added — SMART App Launch v2 (Phase 6) (2026-09-07)
+
+PeriopUDI is now EHR-launchable. New blueprint `services/gudid-core/smart_launch.py`
+(registered in `app.py`), public client + PKCE, `requests` + stdlib only — no
+`fhirclient` dependency.
+
+- **Routes**: `GET /launch` (EHR launch, `iss` + `launch`), `GET /launch/standalone`
+  (patient picker at the auth server), `GET /smart/callback` (code → token +
+  patient context, stored in the Flask session), `GET /smart/status`,
+  `GET|POST /smart/logout`, `GET /.well-known/smart-configuration`.
+- **Auth server discovery**: `.well-known/smart-configuration` with a
+  CapabilityStatement `oauth-uris` fallback. Verified against
+  `https://launch.smarthealthit.org/v/r4/fhir`.
+- **Scopes** (minimum-necessary, `Config.SMART_SCOPES`): `launch openid fhirUser
+  profile patient/Patient.read patient/Device.read patient/Device.write
+  patient/Procedure.read`. Standalone launch swaps `launch` → `launch/patient`.
+- **FHIR retargeting**: `scan_to_chart` gained `set_fhir_context` /
+  `clear_fhir_context` (a `contextvars` override). `app.py`'s `before_request`
+  hook installs the launched FHIR base + bearer token when a SMART session is
+  live; otherwise everything keeps talking to the local HAPI server. `HapiClient`
+  gained an `extra_headers` arg to carry the token.
+- **UI**: scan-to-chart shows a "Launched from EHR" banner and locks the patient
+  picker to the launch context; otherwise shows a "Connect to an EHR (SMART)"
+  link. Callback redirects to `/scan-to-chart?patient_id=<patient>`.
+- **Token storage**: SMART access/refresh tokens are JWTs of ~700–1500 chars each;
+  putting both in the signed session cookie pushes it past the 4093-byte browser
+  limit, and browsers drop an oversized cookie *silently* (OAuth appears to
+  succeed, then the app has no session). The cookie therefore holds only a random
+  handle and the tokens live in an in-process store. Measured: cookie is 188 B
+  regardless of token size. **Assumes one app process** — the Dockerfile runs
+  gunicorn `--workers 1`; use Redis/a DB table before scaling out.
+- **Recall surveillance follows the launch**: `get_patient_recall_cards` now sends
+  `fhirServer: _fhir_base` so the CDS Hooks service reads devices from whichever
+  server holds them (local HAPI normally, the launched server during a SMART
+  session). Previously it always pointed at local HAPI, so recall cards would have
+  come back empty during an EHR-launched demo.
+- **Config**: `SECRET_KEY` is now active in `config.py` (was commented out) — it
+  signs the session that carries the OAuth state/PKCE verifier/session handle. New
+  env: `APP_BASE_URL`, `SMART_CLIENT_ID`, `SMART_DEFAULT_ISS` (see `.env.example`
+  and `docker-compose.yml`).
+- **Hardening**: `next=` is restricted to same-site absolute paths (open-redirect);
+  patient id is URL-encoded into the post-login redirect; the callback rejects a
+  token response with no `access_token`; `.well-known` no longer advertises
+  `authorize-post`, which the client does not implement.
+- **Not yet**: full browser OAuth round-trip is a manual test; Epic/Cerner
+  sandbox registration pending.
 
 ---
 
@@ -228,7 +319,7 @@ interactive magnet simulation. Implant location is now real patient data.
 
 ### Added — Perioperative Protocol Layer (2026-06-10)
 
-Implements all five features from Suggestions.md on a shared foundation: a UDI scan now
+Implements all five requested clinical features on a shared foundation: a UDI scan now
 returns actionable perioperative guidance ("what do I do right now"), not just a data sheet.
 
 - **Protocol knowledge base (SQLite)** — `services/gudid-core/protocol_db.py` +
@@ -278,11 +369,14 @@ correct).
 
 ### In Progress (Phase 6–8)
 
-- [ ] **Phase 6: SMART App Launch v2** — EHR integration with OAuth2, patient context
-  - [ ] `/.well-known/smart-configuration` endpoint
-  - [ ] `/launch` endpoint with OAuth2 callback
-  - [ ] FHIRCLIENT library integration
-  - [ ] Testing against SMART Health IT launcher
+- [x] **Phase 6: SMART App Launch v2** — EHR integration with OAuth2, patient context
+  - [x] `/.well-known/smart-configuration` endpoint
+  - [x] `/launch` (EHR) + `/launch/standalone` + `/smart/callback` OAuth2 code flow
+  - [x] Public client + PKCE (S256), no client secret — `requests` + stdlib, no `fhirclient` dep
+  - [x] Minimum-necessary scopes (`Config.SMART_SCOPES`)
+  - [x] Active SMART session retargets `scan_to_chart` FHIR reads/writes at the launched server (bearer token); no session → local HAPI
+  - [x] Discovery + authorize redirect verified against the SMART Health IT sandbox; full browser round-trip pending manual test
+  - [ ] Register redirect URL with Epic/Cerner sandboxes
   
 - [ ] **Phase 7: CI Conformance Validation** — GitHub Actions for US Core validation
   - [ ] GitHub Actions workflow (`.github/workflows/validate.yml`)
@@ -305,7 +399,7 @@ correct).
 **Completed:** 2026-05-19
 
 **Tasks:**
-- [x] Created repo layout per Build.md §3
+- [x] Created the service-oriented repo layout
 - [x] Moved existing Flask app into `services/gudid-core/`
 - [x] Created stub READMEs in each service directory
 - [x] Initialized `.gitignore`, `LICENSE`, `CITATION.cff`, `Makefile`
