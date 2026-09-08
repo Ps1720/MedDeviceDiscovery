@@ -169,6 +169,8 @@ Mounts `services/gudid-core` (and the two `fhir-bridge` modules) live and runs
 | `/api/lookup/di/<di>` | GET | Look up by Device Identifier |
 | `/api/search?q=` | GET | Search devices |
 | `/api/protocol/by-di/<di>` | GET | Perioperative protocol block for a DI |
+| `/api/pathway` | GET | Resolve the perioperative pathway from case parameters |
+| `/api/pathway/inputs` | GET | The three case questions and the classes they apply to |
 | `/api/quick-facts` | GET | Magnet rate / MRI / support-line strip |
 | `/api/ifu/extract` | POST | Kick off the IFU find→extract→validate pipeline |
 | `/api/ifu/status` | GET | Live pipeline status (polled by the scan page) |
@@ -177,6 +179,9 @@ Mounts `services/gudid-core` (and the two `fhir-bridge` modules) live and runs
 | `/api/device/<device_id>/implant-site` | PUT | Set clinician-confirmed implant location |
 | `/generate-qr` | POST | Create a custom QR code |
 | `/qr/<device_id>` | GET | QR image |
+| `/manuals/<file>` | GET | Serve a manual from the offline library |
+| `/api/ifu/suggest` | GET | Best offline manual for a device |
+| `/login` · `/logout` | GET/POST | Local sign-in for the synthetic-data deployment |
 | `/health` | GET | Health check |
 
 ---
@@ -185,6 +190,13 @@ Mounts `services/gudid-core` (and the two `fhir-bridge` modules) live and runs
 
 IFU = the manufacturer's official device manual. PeriopUDI finds and reads them
 automatically:
+
+The scan-to-chart page carries a **camera scanner** that reads GS1 DataMatrix —
+what implant packaging actually uses — via the native `BarcodeDetector` where
+available and `@zxing/browser` otherwise. It also accepts PeriopUDI's own QR
+codes and GS1 Digital Link URLs, reducing each to the device identifier. Camera
+capture requires a secure context, so it works on `localhost` or over HTTPS but
+is blocked over plain HTTP on a LAN address.
 
 1. **Find** — the **offline manual library** first (12 manuals committed under
    `services/gudid-core/data/manuals/`, instant, no network); then the curated seed table;
@@ -200,8 +212,14 @@ automatically:
 5. **Store with provenance** — facts keyed to brand/manufacturer, shown with a "Brand"
    badge (from the actual manual, not a generic guideline).
 
-Every extracted fact carries a mandatory `requires_verification` flag until a clinician
-signs off — a deliberate safety gate:
+Extracted facts are **grounded against the source document**: numeric claims must
+appear verbatim, textual claims must carry the terms they depend on, and
+unsupported facts are discarded. This exists because the model once produced a
+plausible electrocautery recommendation for a manual that never mentions
+electrocautery.
+
+Every extracted fact then carries a mandatory `requires_verification` flag until a
+clinician signs off — a deliberate safety gate:
 
 ```bash
 cd services/gudid-core

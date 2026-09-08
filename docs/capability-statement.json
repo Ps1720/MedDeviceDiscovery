@@ -1,0 +1,122 @@
+{
+  "resourceType": "CapabilityStatement",
+  "id": "periopudi",
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h2>PeriopUDI FHIR Client Capability Statement</h2><p>PeriopUDI is a SMART App Launch v2 public client (PKCE) for perioperative device documentation. It writes US Core v8.0.1 Implantable Device resources and reads Patient, Device and Procedure on FHIR R4 (4.0.1).</p><ul><li><b>Device</b>: create, read, update, delete, search-type (patient, _sort)</li><li><b>Patient</b>: read, search-type (_count, _elements)</li><li><b>Procedure</b>: patch (focalDevice via JSON Patch)</li></ul></div>"
+  },
+  "url": "https://github.com/Ps1720/MedDeviceDiscovery/docs/capability-statement.json",
+  "version": "0.1.0",
+  "name": "PeriopUDI",
+  "title": "PeriopUDI FHIR Client Capability Statement",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-09-08",
+  "publisher": "Department of Anesthesiology, University of Alabama at Birmingham",
+  "description": "Describes how PeriopUDI, a SMART-on-FHIR perioperative device documentation application, interacts with a FHIR R4 server. PeriopUDI is a client: it reads Patient, Device and Procedure resources and writes US Core Implantable Device resources to the patient's chart. This statement lists only the interactions the application actually performs. Perioperative device documentation launched from an EHR via SMART App Launch v2, or standalone against a local HAPI FHIR R4 server.",
+  "kind": "capability",
+  "software": {
+    "name": "PeriopUDI",
+    "version": "0.1.0"
+  },
+  "fhirVersion": "4.0.1",
+  "format": [
+    "json",
+    "application/fhir+json"
+  ],
+  "patchFormat": [
+    "application/json-patch+json"
+  ],
+  "implementationGuide": [
+    "http://hl7.org/fhir/us/core/ImplementationGuide/hl7.fhir.us.core|8.0.1"
+  ],
+  "rest": [
+    {
+      "mode": "client",
+      "documentation": "PeriopUDI acts as a SMART App Launch v2 public client (authorization code flow with PKCE, S256). Scopes requested are minimum-necessary: launch, openid, fhirUser, patient/Patient.read, patient/Device.read, patient/Device.write, patient/Procedure.read. In standalone launch the 'launch' scope is replaced by 'launch/patient'.",
+      "security": {
+        "service": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/restful-security-service",
+                "code": "SMART-on-FHIR",
+                "display": "SMART-on-FHIR"
+              }
+            ]
+          }
+        ],
+        "description": "OAuth2 authorization code flow per SMART App Launch v2. Public client with PKCE; no client secret. Access and refresh tokens are held server-side and never placed in a browser cookie."
+      },
+      "resource": [
+        {
+          "type": "Device",
+          "supportedProfile": [
+            "http://hl7.org/fhir/us/core/StructureDefinition/us-core-implantable-device"
+          ],
+          "documentation": "Written on every scan-to-chart operation, mapped from the FDA GUDID record for the scanned UDI. Carries udiCarrier (deviceIdentifier, carrierHRF), manufacturer, modelNumber, deviceName, type, patient reference, and safety codings. Production identifiers (serialNumber, lotNumber, expirationDate, manufactureDate) are populated only from a scanned full UDI, never inferred. May carry the extension https://periop-udi.local/fhir/StructureDefinition/implant-site recording the clinician-confirmed lead configuration and pocket side as SNOMED CT body-site codings.",
+          "interaction": [
+            {
+              "code": "create"
+            },
+            {
+              "code": "read"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "delete"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "patient",
+              "type": "reference",
+              "documentation": "Devices for a patient's perioperative timeline and for recall matching."
+            },
+            {
+              "name": "_sort",
+              "type": "string",
+              "documentation": "-_lastUpdated, for the recent-devices feed."
+            }
+          ]
+        },
+        {
+          "type": "Patient",
+          "documentation": "Read for demographics in the patient header and for the patient picker. Never written.",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_count",
+              "type": "number"
+            },
+            {
+              "name": "_elements",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "type": "Procedure",
+          "documentation": "Optionally linked to a documented Device by adding the Device to Procedure.focalDevice via JSON Patch. Read-only otherwise.",
+          "interaction": [
+            {
+              "code": "patch"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

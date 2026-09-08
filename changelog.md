@@ -8,6 +8,90 @@ All notable changes to the PeriopUDI project are documented in this file. This c
 
 ---
 
+### Added — Case-parameter pathway engine; extraction integrity (2026-09-08)
+
+**Pathway engine.** Three case questions — surgical field above the umbilicus,
+monopolar cautery expected, pacing dependence — select one perioperative pathway
+for cardiac devices. Requested directly by the clinical collaborators.
+
+- `data/pathway_rules.json` — rules as versioned data, not code: condition,
+  output text and citation per rule, reviewable without reading Python. Every
+  rule ships `requires_verification: true`; the collaborator wrote "if surgery
+  expected to extend above the umbilicus and monopolar cautery use expected, then
+  xxxxxx" and left the consequent blank, so this content is a draft awaiting them.
+- `pathway_engine.py` + `GET /api/pathway`, `GET /api/pathway/inputs`.
+- **Unknown is not "No".** An unanswered question resolves to the conservative
+  branch and the result reports the assumption. Every result states the inputs
+  that produced it, so a wrong recommendation can be traced to the wrong input.
+- Pacing dependence defaults to "not determined" and is never inferred.
+- The escalated branch splits by device type: ICD/CRT-D suspend tachytherapy and
+  place external pads; pacemakers arrange asynchronous pacing when dependent *or
+  undetermined*.
+- Rendered in the protocol card above the existing checklist. No checklist items
+  are hidden — deciding which items drop out is a clinical judgement the
+  collaborators have not yet made.
+
+**Extraction integrity — the model fabricated a fact.** Asked to extract from the
+Medtronic Azure manual, the model returned an electrocautery recommendation for a
+document containing zero occurrences of "electrocautery", "cautery" or
+"tachytherapy". It was stored and displayed badged "Extracted from IFU", beside
+genuinely extracted facts such as the magnet rate of 65.
+
+- **Grounding check** (`ifu_extractor._is_grounded`): numeric claims must appear
+  verbatim in the source; textual claims must carry the domain terms they depend
+  on. Unsupported facts are dropped. Short abbreviations match on word boundaries
+  — as a bare substring "esu" matches "result" and "resume", which let the
+  fabricated cautery text pass the first version of the check.
+- Audited all stored LLM facts against their manuals; removed 2 fabricated.
+- **Page ranking.** Pages were taken in document order and truncated at 12,000
+  characters, so a 312-page manual spent the whole budget on its table of
+  contents. Pages are now ranked by weighted keyword density, then restored to
+  document order. Weak terms ("therapy", "support") score near zero — they
+  matched 212 of 312 pages, which is noise rather than a filter.
+- **Rate-unit awareness.** Medtronic writes "65 min-1", never "bpm", so the
+  magnet-rate page ranked 7th and fell outside the budget. Ranking now rewards a
+  number adjacent to any rate unit, more so when "magnet" is on the same page.
+
+**Fixed**
+
+- `no_facts` was unreachable: `ifu_validator` returned "No extracted facts to
+  validate" as a *conflict*, so every device whose manual could not be found was
+  recorded as a conflict. Conflict suppression appeared to fire constantly when
+  it had never fired at all. 4 historical records relabelled.
+- Re-seeding wiped LLM-extracted facts. `brand_facts` is in `CONTENT_TABLES`, so
+  bumping `SEED_VERSION` destroyed the extracted Azure magnet rate of 65 and left
+  the generic seeded Medtronic 85 bpm in its place — a value the Azure manual
+  explicitly contradicts. Re-seed now deletes only `source != 'llm'`.
+- Manufacturer aliases: GUDID files Abbott's cardiac devices under "ST. JUDE
+  MEDICAL, INC.", so the Gallant matched no manual. `manufacturer_patterns` now
+  accepts a list; added St. Jude/SJM and Guidant aliases.
+- Citations beginning "VERIFY" carried two meanings — a missing citation and a
+  real source to check — rendered identically, so sound content read as invented.
+  Placeholders now render as nothing; real sources render as citations.
+- Pacing-dependence guidance corrected per collaborator feedback: an on-demand
+  programmed mode does not exclude dependence.
+- Support-contact numbers are all hand-entered and unverified; the card now says
+  so beside the number.
+
+**Camera scanning**
+
+- Barcode scanning moved into the scan-to-chart UDI field. `BarcodeDetector`
+  where available, `@zxing/browser` as fallback — both handle **GS1 DataMatrix**,
+  which is what implant packaging actually carries; a 1D-only reader is close to
+  useless on a real device box.
+- Scanned payloads are normalised: PeriopUDI's own QR codes encode a URL so a
+  plain phone camera opens the device page, and GS1 Digital Link encodes
+  `https://id.gs1.org/01/<GTIN>`. Both reduce to the identifier.
+- `getUserMedia` requires a secure context, so the camera is blocked over plain
+  HTTP on a LAN address. The button says so rather than failing silently.
+
+**SMART navigation.** The launched patient's chart lives on the EHR's FHIR
+server, so they never appear in the local patient list and were unreachable once
+you navigated away. The header context chip, and the patient name in the scan
+banner, now link to the chart; the timeline states which server it is reading.
+
+---
+
 ### Added — Offline manual library; IFU finding no longer depends on the open web (2026-09-07)
 
 **The curated IFU path was silently broken.** Every `ifu_url` in `data/ifu_seed.json`

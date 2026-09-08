@@ -22,6 +22,8 @@ which covers the system diagram and deployment topology; this document covers th
 | `ifu_finder.py` | Locates a manual: local library → curated seed → GUDID → EUDAMED → web |
 | `ifu_extractor.py` | Downloads/reads the PDF, filters pages, calls the LLM |
 | `ifu_validator.py` | Cross-checks extracted facts against GUDID |
+| `pathway_engine.py` | Resolves the perioperative pathway from case parameters |
+| `auth.py` / `auth_routes.py` | Access gate and local sign-in |
 | `ifu_pipeline.py` | Drives find → extract → validate → store; CLI for clinician sign-off |
 | `ifu_store.py` | Persists extracted facts with provenance |
 | `qr_generator.py` / `database_setup.py` | QR codes and their local catalogue |
@@ -96,8 +98,14 @@ ifu_pipeline.run_pipeline(manufacturer, brand, model, di, ifu_url=None)
   │    Step  5  _try_bing / _try_google_cse / _try_duckduckgo
   ├─ ifu_extractor.extract_from_url(url)
   │    _download_pdf              http(s) | file:// | /manuals/<file> | local path
-  │    _extract_relevant_text     pdfplumber, keep pages matching magnet/MRI/cautery/EMI
+  │    _extract_relevant_text     pdfplumber; pages RANKED by weighted keyword
+  │                               density, not document order, then restored to
+  │                               document order (a 312-page manual otherwise
+  │                               spends the whole budget on its contents page)
   │    _call_llm                  constrained JSON schema, ≤12k chars
+  │    _drop_ungrounded           every fact must point at evidence in the source
+  │                               text; numbers verbatim, claims need their domain
+  │                               terms. Unsupported facts are discarded.
   ├─ ifu_validator                cross-check against the GUDID record
   │                               conflicts are withheld from display, not shown silently
   └─ ifu_store                    persist with provenance + requires_verification=1
@@ -135,6 +143,30 @@ protocol_service.build_protocol_block(gudid_record)
 Protocol content is **reference data, not patient data** — it is re-derived at render
 time and never written into a FHIR resource. The one exception is the clinician-confirmed
 implant site, which is a `Device` extension because it records a clinical decision.
+
+---
+
+## Flow 3b — Case-parameter pathway
+
+`GET /api/pathway?class_key=&surgical_site=&cautery=&pacing_dependence=`
+
+```
+pathway_engine.resolve(class_key, answers)
+  ├─ load data/pathway_rules.json      rules as data: condition, output, citation
+  ├─ _resolve_input per question       an unknown answer falls to the conservative
+  │                                    value and is recorded as an assumption
+  ├─ match the site × cautery matrix   no matching cell also fails conservative
+  └─ filter escalated_actions          by device class, and by answers where the
+                                       action declares a `when` clause
+```
+
+Returns the pathway, a `because` string naming the inputs that selected it, the
+assumptions applied, and the actions. Rendered above the checklist; no checklist
+items are hidden, because which items drop out is a clinical judgement.
+
+Pacing dependence is never inferred from the UDI or the programmed mode: devices
+are commonly programmed on-demand even in patients with no intrinsic escape
+rhythm, so an on-demand mode does not exclude dependence.
 
 ---
 
@@ -201,4 +233,5 @@ This assumes a single application process (the container runs gunicorn with
 | `qr_codes.db` | SQLite | generated QR-code catalogue |
 | `services/cds-hooks/data/recalls.db` | SQLite | cached openFDA recall feed |
 | `data/manuals/` | files | offline manual library + `index.json` |
+| `data/pathway_rules.json` | file | versioned pathway rules, reviewable as data |
 | `eval/usage_logs/scans.csv` | CSV | scan telemetry for evaluation |
