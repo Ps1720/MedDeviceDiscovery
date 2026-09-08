@@ -414,7 +414,90 @@
                         <p class="text-slate-500 text-sm">Click to search real FDA GUDID devices</p>
                     </div>
                 </div>
-                
+
+                <!-- Implantable devices with perioperative protocol coverage.
+                     Every DI below is verified against live GUDID and resolves to
+                     a device class; "Manual" marks the ones that also match the
+                     offline manual library, so IFU extraction runs end to end. -->
+                <div class="mb-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Implantable devices &middot; protocol coverage
+                        </p>
+                        <span class="text-[11px] text-slate-400">green = manual in library</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+
+                        <button onclick="quickSearch('00643169634589')" class="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900">Medtronic Azure XT DR</div>
+                                <div class="text-xs text-slate-500">00643169634589 &middot; pacemaker &middot; Manual</div>
+                            </div>
+                            <span class="material-icons-round text-emerald-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('05425025750405')" class="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900">LivaNova SenTiva VNS</div>
+                                <div class="text-xs text-slate-500">05425025750405 &middot; VNS &middot; Manual</div>
+                            </div>
+                            <span class="material-icons-round text-emerald-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('00389152000107')" class="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900">Tandem t:slim X2 Control-IQ</div>
+                                <div class="text-xs text-slate-500">00389152000107 &middot; closed loop &middot; Manual</div>
+                            </div>
+                            <span class="material-icons-round text-emerald-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('00813426020121')" class="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900">Nevro Senza SCS</div>
+                                <div class="text-xs text-slate-500">00813426020121 &middot; spinal cord stim &middot; Manual</div>
+                            </div>
+                            <span class="material-icons-round text-emerald-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('05415067049520')" class="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900">Abbott/St. Jude Gallant</div>
+                                <div class="text-xs text-slate-500">05415067049520 &middot; CRT-D &middot; Manual</div>
+                            </div>
+                            <span class="material-icons-round text-emerald-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('00763000519216')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900 group-hover:text-primary-700">Medtronic Percept PC DBS</div>
+                                <div class="text-xs text-slate-500">00763000519216 &middot; DBS</div>
+                            </div>
+                            <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('00199150047048')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900 group-hover:text-primary-700">Medtronic MiniMed 780G</div>
+                                <div class="text-xs text-slate-500">00199150047048 &middot; closed loop</div>
+                            </div>
+                            <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                        </button>
+
+                        <button onclick="quickSearch('00386270003584')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
+                            <div>
+                                <div class="font-medium text-slate-900 group-hover:text-primary-700">Dexcom G7 CGM</div>
+                                <div class="text-xs text-slate-500">00386270003584 &middot; CGM</div>
+                            </div>
+                            <span class="material-icons-round text-slate-400 group-hover:text-primary-500">arrow_forward</span>
+                        </button>
+
+                    </div>
+                </div>
+
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 mt-6">
+                    Anesthesia equipment
+                </p>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     <button onclick="quickSearch('00840682123990')" class="flex items-center justify-between bg-slate-50 hover:bg-primary-50 border border-slate-100 hover:border-primary-200 rounded-xl px-4 py-3 transition-all group text-left">
                         <div>
@@ -477,8 +560,8 @@
                         <span class="material-icons-round text-white text-sm">biotech</span>
                     </div>
                     <div>
-                        <p class="font-semibold text-slate-900 text-sm">Medical Device Discovery</p>
-                        <p class="text-slate-500 text-xs">STA Engineering Challenge 2026</p>
+                        <p class="font-semibold text-slate-900 text-sm">PeriopUDI</p>
+                        <p class="text-slate-500 text-xs">Perioperative device documentation</p>
                     </div>
                 </div>
                 <div class="text-slate-500 text-sm">

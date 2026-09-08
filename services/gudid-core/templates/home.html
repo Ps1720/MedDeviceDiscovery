@@ -191,9 +191,24 @@
           <span class="dot blink-soft" style="background: var(--primary);"></span>
           FHIR connected
         </span>
-        <span class="chip hidden md:inline-flex" style="background: var(--primary-soft); color: var(--primary-deep);">
-          AMIA 2026
-        </span>
+        {% if smart %}
+        {# The launched patient is otherwise unreachable once you navigate away:
+           their chart lives on the EHR's FHIR server, so they do not appear in
+           the local patient list. Make the context chip the way back to it. #}
+        <a href="{{ '/patient/' ~ smart.patient ~ '/timeline' if smart.patient else '#' }}"
+           class="chip" title="Open {{ smart.patient_name }}'s chart"
+           style="background: var(--emerald-pale, #f0fdf4); color: var(--emerald-deep, #16a34a); border: 1px solid var(--emerald-deep, #16a34a);">
+          <span class="dot" style="background: var(--emerald-deep, #16a34a);"></span>
+          EHR: {{ smart.patient_name }} &rarr;
+        </a>
+        <a href="/smart/logout" class="chip" style="background: var(--surface-warm); color: var(--ink-3); border: 1px solid var(--rule);">
+          Disconnect
+        </a>
+        {% else %}
+        <a href="/launch/standalone" class="chip" style="background: var(--primary-soft); color: var(--primary-deep); border: 1px solid var(--primary);">
+          Connect EHR &middot; SMART
+        </a>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -525,7 +540,7 @@
           <div class="font-display text-[20px] font-medium mb-1" style="color: var(--ink);">PeriopUDI</div>
           <div class="text-[13px]" style="color: var(--ink-3);">
             Built at UAB Anesthesiology.<br>
-            For the AMIA 2026 FHIR App Competition.
+            SMART on FHIR &middot; US Core v8.0.1 &middot; CDS Hooks
           </div>
         </div>
         <div>

@@ -37,7 +37,7 @@
 </head>
 <body class="min-h-screen">
     <header class="sticky top-0 z-30" style="background: rgba(246,247,249,0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--rule-soft);">
-      <div class="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <a href="/" class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: var(--primary);">
             <div class="grid grid-cols-2 gap-0.5">
@@ -60,8 +60,8 @@
       </div>
     </header>
 
-    <main class="max-w-3xl mx-auto px-6 py-8">
-        <header class="mb-6">
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <header class="mb-6 max-w-3xl">
             <p class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--ink-4);">Scan to chart</p>
             <h1 class="text-[26px] font-semibold tracking-tight mt-0.5">Document Device to Chart</h1>
             <p class="text-[14px] mt-1" style="color: var(--ink-3);">Scan a UDI, pick a patient, and write a US Core
@@ -69,29 +69,46 @@
         </header>
 
         {% if smart %}
-        <div class="mb-5 rounded-xl px-4 py-3 flex items-center gap-3"
+        <div class="mb-5 max-w-3xl rounded-xl px-4 py-3 flex items-center gap-3"
              style="background: var(--emerald-pale, #f0fdf4); border: 1px solid var(--emerald-deep, #16a34a);">
             <span style="color: var(--emerald-deep, #16a34a); font-size: 15px;">&#9679;</span>
             <div class="text-[12px] leading-snug" style="color: var(--ink-2);">
                 <span class="font-semibold">Launched from EHR via SMART App Launch.</span>
                 Writing to <span class="font-mono">{{ smart.iss }}</span>.<br>
                 Patient context:
-                <span class="font-semibold">{{ smart.patient_name }}</span>
-                <span class="font-mono" style="color: var(--ink-4);">({{ smart.patient }})</span>
-                {% if smart.fhir_user %} &middot; user <span class="font-mono">{{ smart.fhir_user }}</span>{% endif %}
+                <a href="/patient/{{ smart.patient }}/timeline" class="font-semibold underline"
+                   style="color: var(--ink);" title="Open this patient's chart">{{ smart.patient_name }}</a>
+                <span class="font-mono" style="color: var(--ink-4);"
+                      title="{{ smart.patient }}">{{ smart.patient[:8] }}…</span>
+                {% if smart.fhir_user %}
+                &middot; <span class="font-mono" title="{{ smart.fhir_user }}">{{ smart.fhir_user.split('/')[0] }}</span>
+                {% endif %}
             </div>
         </div>
         {% else %}
-        <div class="mb-5 text-[12px]" style="color: var(--ink-4);">
+        <div class="mb-5 max-w-3xl text-[12px]" style="color: var(--ink-4);">
             Running against the local HAPI server.
             <a href="/launch/standalone" class="font-semibold" style="color: var(--primary);">Connect to an EHR (SMART) &rarr;</a>
         </div>
         {% endif %}
 
-        <div class="surface p-6 space-y-4">
+        <div class="surface p-6 space-y-4 max-w-2xl">
             <div>
                 <label class="block text-[13px] font-semibold mb-1" style="color: var(--ink-2);">UDI / Device Identifier</label>
-                <input id="udi" type="text" placeholder="e.g. 08717648200274 or full (01)... UDI" class="field font-mono">
+                <div class="flex gap-2">
+                    <input id="udi" type="text" placeholder="e.g. 08717648200274 or full (01)... UDI" class="field font-mono">
+                    <button id="scan-btn" type="button"
+                            class="shrink-0 px-3.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5"
+                            style="border:1px solid var(--rule); background: var(--surface-warm); color: var(--ink-2);"
+                            title="Scan the device barcode with the camera">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+                            <path d="M7 12h10"/>
+                        </svg>
+                        Scan
+                    </button>
+                </div>
+                <p id="scan-msg" class="text-[11px] mt-1.5" style="color: var(--ink-4); min-height: 1.1em;"></p>
             </div>
 
             <div>
@@ -124,6 +141,31 @@
             </div>
 
             <button id="document-btn" class="btn-primary">Document Device</button>
+        </div>
+
+        <!-- Camera scanner overlay -->
+        <div id="scanner-modal" class="hidden fixed inset-0 z-50 flex flex-col"
+             style="background: rgba(12,14,18,0.94);">
+            <div class="flex items-center justify-between px-5 py-4">
+                <div class="text-white text-[14px] font-semibold">Scan device barcode</div>
+                <button id="scanner-close" type="button"
+                        class="text-white/80 text-[13px] font-semibold px-3 py-1.5 rounded-lg"
+                        style="border:1px solid rgba(255,255,255,0.25);">Cancel</button>
+            </div>
+            <div class="flex-1 flex items-center justify-center px-5 pb-5 min-h-0">
+                <div class="relative w-full" style="max-width: 560px;">
+                    <video id="scanner-video" playsinline muted
+                           class="w-full rounded-2xl bg-black" style="max-height: 62vh; object-fit: cover;"></video>
+                    <!-- framing guide -->
+                    <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div style="width:68%; aspect-ratio: 1.6; border:2px solid rgba(255,255,255,0.85);
+                                    border-radius:14px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.28);"></div>
+                    </div>
+                </div>
+            </div>
+            <p id="scanner-hint" class="text-center text-white/70 text-[12px] px-6 pb-6">
+                Hold the device label steady inside the frame.
+            </p>
         </div>
 
         <div id="result" class="mt-6 hidden"></div>
@@ -210,7 +252,194 @@
 
         // When opened from a patient chart ("+ Document device"), the patient
         // is already known — preselect them instead of asking again.
+        // ------------------------------------------------------------------
+        // Camera barcode scanning
+        //
+        // Implant packaging is overwhelmingly GS1 DataMatrix (2D), not a linear
+        // barcode, so a 1D-only reader is close to useless on a real device box.
+        // Two decoders, in order of preference:
+        //   1. BarcodeDetector — native, fast, no download. Chrome/Android.
+        //   2. @zxing/browser  — loaded lazily only if (1) is missing. Covers
+        //      iOS Safari, where BarcodeDetector does not exist.
+        //
+        // getUserMedia requires a SECURE CONTEXT: https, or localhost. Over
+        // plain http on a LAN address the camera is blocked by the browser and
+        // no permission prompt ever appears — hence the explicit check below.
+        // ------------------------------------------------------------------
+        const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js';
+        const BARCODE_FORMATS = [
+            'data_matrix', 'qr_code', 'code_128', 'code_39',
+            'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf',
+        ];
+
+        const scanBtn      = document.getElementById('scan-btn');
+        const scanMsg      = document.getElementById('scan-msg');
+        const scannerModal = document.getElementById('scanner-modal');
+        const scannerVideo = document.getElementById('scanner-video');
+        const scannerHint  = document.getElementById('scanner-hint');
+        let mediaStream = null, detectLoop = null, zxingControls = null;
+
+        function setScanMsg(text, isError) {
+            scanMsg.textContent = text || '';
+            scanMsg.style.color = isError ? 'var(--coral-deep)' : 'var(--ink-4)';
+        }
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('could not load the barcode library'));
+                document.head.appendChild(s);
+            });
+        }
+
+        // A scanned code can arrive in several shapes. Reduce them all to the
+        // identifier the UDI parser expects:
+        //   08717648200274                        bare device identifier
+        //   (01)087176...(17)261231(10)LOT1       full UDI with GS1 AIs
+        //   http://host:8090/device/0871764...    PeriopUDI's own QR codes,
+        //                                         which encode a URL so a plain
+        //                                         phone camera opens the device
+        //                                         page without an app
+        //   https://id.gs1.org/01/08717648200274  GS1 Digital Link, increasingly
+        //                                         used on newer packaging
+        function normalizeScannedCode(raw) {
+            const text = (raw || '').trim();
+            if (!text) return '';
+            if (!/^https?:\/\//i.test(text)) return text;   // not a URL — parser handles it
+
+            let url;
+            try { url = new URL(text); } catch (e) { return text; }
+            const seg = url.pathname.split('/').filter(Boolean);
+
+            // GS1 Digital Link: application identifier 01 is the GTIN / device identifier
+            const gtinAt = seg.indexOf('01');
+            if (gtinAt !== -1 && seg[gtinAt + 1]) return decodeURIComponent(seg[gtinAt + 1]);
+
+            // PeriopUDI's own QR: /device/<identifier>
+            const devAt = seg.indexOf('device');
+            if (devAt !== -1 && seg[devAt + 1]) return decodeURIComponent(seg[devAt + 1]);
+
+            // Unknown URL shape — the last path segment is the best guess
+            return seg.length ? decodeURIComponent(seg[seg.length - 1]) : text;
+        }
+
+        function onBarcode(raw) {
+            const code = normalizeScannedCode(raw);
+            if (!code) return;
+            closeScanner();
+            udiInput.value = code;
+            // reuse the existing debounced GUDID pre-lookup
+            udiInput.dispatchEvent(new Event('input', { bubbles: true }));
+            setScanMsg('Scanned ' + (code.length > 34 ? code.slice(0, 34) + '…' : code));
+            if (navigator.vibrate) navigator.vibrate(120);
+        }
+
+        async function openScanner() {
+            if (!window.isSecureContext) {
+                setScanMsg('Camera needs HTTPS. On a phone, open this app over https (or use localhost on this machine) — then Scan will work.', true);
+                return;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setScanMsg('This browser has no camera API. Enter the UDI manually.', true);
+                return;
+            }
+
+            setScanMsg('Starting camera…');
+            scannerModal.classList.remove('hidden');
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' } }, audio: false,
+                });
+            } catch (e) {
+                closeScanner();
+                const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+                setScanMsg(denied
+                    ? 'Camera permission denied. Allow camera access for this site, then try again.'
+                    : 'No camera available: ' + (e.message || e.name), true);
+                return;
+            }
+
+            scannerVideo.srcObject = mediaStream;
+            await scannerVideo.play().catch(() => {});
+            setScanMsg('');
+
+            if ('BarcodeDetector' in window) {
+                let formats = BARCODE_FORMATS;
+                try {
+                    const supported = await window.BarcodeDetector.getSupportedFormats();
+                    formats = BARCODE_FORMATS.filter(f => supported.includes(f));
+                } catch (e) { /* use the full list */ }
+                if (formats.length) {
+                    scannerHint.textContent = 'Hold the device label steady inside the frame.';
+                    runNativeDetector(formats);
+                    return;
+                }
+            }
+            runZxing();
+        }
+
+        function runNativeDetector(formats) {
+            const detector = new window.BarcodeDetector({ formats });
+            let busy = false;
+            detectLoop = setInterval(async () => {
+                if (busy || scannerVideo.readyState < 2) return;
+                busy = true;
+                try {
+                    const found = await detector.detect(scannerVideo);
+                    if (found && found.length) onBarcode(found[0].rawValue);
+                } catch (e) { /* transient decode failure — keep scanning */ }
+                busy = false;
+            }, 220);
+        }
+
+        async function runZxing() {
+            scannerHint.textContent = 'Loading barcode reader…';
+            try {
+                if (!window.ZXingBrowser) await loadScript(ZXING_URL);
+                const reader = new window.ZXingBrowser.BrowserMultiFormatReader();
+                scannerHint.textContent = 'Hold the device label steady inside the frame.';
+                zxingControls = await reader.decodeFromVideoElement(scannerVideo, (result) => {
+                    if (result) onBarcode(result.getText());
+                });
+            } catch (e) {
+                closeScanner();
+                setScanMsg('Could not start the barcode reader: ' + (e.message || e), true);
+            }
+        }
+
+        function closeScanner() {
+            if (detectLoop) { clearInterval(detectLoop); detectLoop = null; }
+            if (zxingControls) {
+                try { zxingControls.stop(); } catch (e) {}
+                zxingControls = null;
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(t => t.stop());
+                mediaStream = null;
+            }
+            scannerVideo.srcObject = null;
+            scannerModal.classList.add('hidden');
+        }
+
+        scanBtn.addEventListener('click', openScanner);
+        document.getElementById('scanner-close').addEventListener('click', closeScanner);
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && !scannerModal.classList.contains('hidden')) closeScanner();
+        });
+        window.addEventListener('pagehide', closeScanner);
+
         const presetPatientId = new URLSearchParams(location.search).get('patient_id');
+        // Name of the EHR-launched patient, when this page was reached via SMART.
+        const smartPatientName = {{ (smart.patient_name if smart else None)|tojson }};
+
+        // Local HAPI uses short numeric ids (1602); an EHR or the SMART sandbox
+        // uses 36-character UUIDs, which read as noise next to a person's name.
+        function shortId(id) {
+            const s = String(id);
+            return s.length > 12 ? s.slice(0, 8) + '…' : s;
+        }
 
         async function loadPatients() {
             try {
@@ -218,13 +447,19 @@
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
                 patientSelect.innerHTML = '<option value="">Select a patient…</option>' +
-                    data.patients.map(p => `<option value="${p.id}">${p.name} (id ${p.id})</option>`).join('');
+                    data.patients.map(p =>
+                        `<option value="${p.id}">${p.name} · ${shortId(p.id)}</option>`).join('');
                 if (presetPatientId) {
                     const match = data.patients.find(p => String(p.id) === presetPatientId);
                     if (!match) {
-                        // Not in the first page of results — add it so it can still be preselected.
-                        patientSelect.insertAdjacentHTML('beforeend',
-                            `<option value="${presetPatientId}">Patient ${presetPatientId}</option>`);
+                        // Not in the first page of results — add it so it can still be
+                        // preselected. Prefer the real name over the raw identifier.
+                        const opt = document.createElement('option');
+                        opt.value = presetPatientId;
+                        opt.textContent = smartPatientName
+                            ? `${smartPatientName} · ${shortId(presetPatientId)}`
+                            : `Patient ${shortId(presetPatientId)}`;
+                        patientSelect.appendChild(opt);
                     }
                     patientSelect.value = presetPatientId;
                     const hint = document.getElementById('patient-from-chart');
@@ -457,7 +692,7 @@
 
                         // Pre-fill from the offline manual library (data/manuals/)
                         // so the clinician isn't asked to hunt for a manufacturer PDF.
-                        (async  => {
+                        (async () => {
                             try {
                                 const q = new URLSearchParams({
                                     manufacturer: d.manufacturer || '',
@@ -544,7 +779,7 @@
             if (!patientSelect.value) {
                 const opt = document.createElement('option');
                 opt.value = smartPid;
-                opt.textContent = `${smartName} (EHR patient ${smartPid})`;
+                opt.textContent = `${smartName} · ${shortId(smartPid)}`;
                 patientSelect.appendChild(opt);
                 patientSelect.value = smartPid;
             }

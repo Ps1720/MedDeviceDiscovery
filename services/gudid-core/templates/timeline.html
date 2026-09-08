@@ -72,9 +72,33 @@
           <div class="text-[11px]" style="color: var(--ink-3);">Patient device chart</div>
         </div>
       </a>
-      <a href="/patients" class="text-[13px] font-semibold" style="color: var(--ink-3);">← All patients</a>
+      <div class="flex items-center gap-3">
+        {% if smart %}
+        <span class="chip" title="Reading from {{ smart.iss }}"
+              style="background: var(--emerald-pale, #f0fdf4); color: var(--emerald-deep, #16a34a); border: 1px solid var(--emerald-deep, #16a34a);">
+          EHR chart &middot; SMART
+        </span>
+        <a href="/smart/logout" class="text-[13px] font-semibold" style="color: var(--ink-3);">Disconnect</a>
+        {% else %}
+        <a href="/patients" class="text-[13px] font-semibold" style="color: var(--ink-3);">← All patients</a>
+        {% endif %}
+      </div>
     </div>
   </header>
+
+  {% if smart %}
+  {# Which server this chart came from is not otherwise visible, and the two
+     look identical. An EHR-launched chart shows only devices documented to the
+     EHR — the local Synthea history is a different data set entirely. #}
+  <div class="max-w-7xl mx-auto px-6 pt-4">
+    <div class="rounded-xl px-4 py-2.5 text-[12px] leading-snug"
+         style="background: var(--emerald-pale, #f0fdf4); border: 1px solid var(--emerald-deep, #16a34a); color: var(--ink-2);">
+      Showing the chart held by the launched EHR
+      (<span class="font-mono">{{ smart.iss }}</span>). Devices documented against
+      the local server are not listed here.
+    </div>
+  </div>
+  {% endif %}
 
   <main class="max-w-7xl mx-auto px-6 py-8">
 
