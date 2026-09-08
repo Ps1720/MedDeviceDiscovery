@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in · PeriopUDI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{
+      --ink:#22201d; --ink-2:#3d3935; --ink-3:#6b645c; --ink-4:#948c82;
+      --surface:#fffdf9; --surface-warm:#f5efe4; --rule:#e2d9cb; --rule-soft:#ece5d9;
+      --primary:#2f6f6b; --primary-deep:#245551; --primary-soft:#e3efee;
+      --coral-deep:#b4463c;
+    }
+    body{background:var(--surface-warm);color:var(--ink);
+         font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+    .field{width:100%;padding:.65rem .8rem;border-radius:.7rem;border:1px solid var(--rule);
+           background:var(--surface);color:var(--ink);font-size:14px;outline:none;}
+    .field:focus{border-color:var(--primary);}
+    .btn{width:100%;padding:.65rem 1rem;border-radius:.7rem;background:var(--primary);
+         color:#fff;font-weight:600;font-size:14px;border:0;cursor:pointer;}
+    .btn:hover{background:var(--primary-deep);}
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-6">
+  <main class="w-full max-w-sm">
+
+    <div class="flex items-center gap-3 mb-7">
+      <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:var(--primary);">
+        <div class="grid grid-cols-2 gap-0.5">
+          <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+          <div class="w-1.5 h-1.5 rounded-sm" style="background:#E89B95;"></div>
+          <div class="w-1.5 h-1.5 rounded-sm" style="background:#E89B95;"></div>
+          <div class="w-1.5 h-1.5 rounded-sm bg-white opacity-90"></div>
+        </div>
+      </div>
+      <div>
+        <div class="font-semibold text-[15px]">PeriopUDI</div>
+        <div class="text-[11px]" style="color:var(--ink-3);">Perioperative device documentation</div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl p-6" style="background:var(--surface);border:1px solid var(--rule);">
+      <h1 class="text-[18px] font-semibold mb-1">Sign in</h1>
+      <p class="text-[12px] leading-relaxed mb-5" style="color:var(--ink-3);">
+        This deployment holds synthetic patient data only. Clinical use goes through
+        an EHR launch.
+      </p>
+
+      {% if error %}
+      <div class="mb-4 rounded-lg px-3 py-2 text-[12px]"
+           style="background:#fdf0ee;border:1px solid var(--coral-deep);color:var(--coral-deep);">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      {% if passcode_configured %}
+      <form method="POST" action="{{ url_for('auth.login') }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="block text-[12px] font-semibold mb-1.5" style="color:var(--ink-2);">Passcode</label>
+        <input class="field" type="password" name="passcode" autocomplete="current-password"
+               autofocus required>
+        <div class="mt-4"><button class="btn" type="submit">Sign in</button></div>
+      </form>
+      {% else %}
+      <div class="rounded-lg px-3 py-2 text-[12px]"
+           style="background:var(--surface-warm);border:1px solid var(--rule);color:var(--ink-3);">
+        No passcode is configured, so local sign-in is disabled. Launch from an EHR below,
+        or set <span class="font-mono">DEMO_PASSCODE</span> on the server.
+      </div>
+      {% endif %}
+
+      <div class="flex items-center gap-3 my-5">
+        <div class="flex-1 h-px" style="background:var(--rule-soft);"></div>
+        <span class="text-[11px]" style="color:var(--ink-4);">or</span>
+        <div class="flex-1 h-px" style="background:var(--rule-soft);"></div>
+      </div>
+
+      <a href="/launch/standalone"
+         class="block text-center py-2.5 rounded-[.7rem] text-[13px] font-semibold"
+         style="background:var(--primary-soft);color:var(--primary-deep);border:1px solid var(--primary);">
+        Launch from EHR &middot; SMART on FHIR
+      </a>
+    </div>
+
+    <p class="text-[11px] text-center mt-5" style="color:var(--ink-4);">
+      University of Alabama at Birmingham &middot; Department of Anesthesiology
+    </p>
+  </main>
+</body>
+</html>

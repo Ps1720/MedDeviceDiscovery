@@ -44,3 +44,10 @@ eval/usage_logs/*.csv
 
 # CDS Hooks recall cache (regenerated at runtime)
 services/cds-hooks/data/*.db
+backups/
+
+# Submission draft and its Word export — working documents, not part of the deliverable
+abstract.md
+PeriopUDI-Submission.docx
+~$*
+*.tmp

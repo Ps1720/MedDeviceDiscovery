@@ -1,0 +1,55 @@
+# Deployment overlay — public VM / shared demo link.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --build
+#
+# What it changes versus the base file:
+#   * HAPI and CDS Hooks publish NO host ports at all. They are reachable only on
+#     the internal Docker network. HAPI has no authentication of its own, so the
+#     only safe posture is not to expose it.
+#   * The app is not published either — Caddy terminates TLS and proxies to it,
+#     so the only thing on the public internet is 80/443.
+#   * Caddy obtains and renews a Let's Encrypt certificate automatically.
+#
+# Required in .env before running (see DEPLOYMENT.md):
+#   PUBLIC_HOSTNAME   the DNS name pointing at this VM, e.g. periopudi.example.org
+#   ACME_EMAIL        contact address for Let's Encrypt
+#   SECRET_KEY        32-byte hex; the app refuses to start without a real one
+#   DEMO_PASSCODE     shared passcode for the synthetic-data sign-in
+#   APP_BASE_URL      https://${PUBLIC_HOSTNAME}   (used for the SMART redirect_uri)
+#   SECURE_COOKIES    true
+#   CORS_ALLOWED_ORIGIN  https://${PUBLIC_HOSTNAME}
+
+services:
+  hapi:
+    ports: !override []
+
+  cds-hooks:
+    ports: !override []
+
+  gudid-core:
+    ports: !override []
+    environment:
+      - REQUIRE_AUTH=true
+      - SECURE_COOKIES=true
+      - FLASK_ENV=production
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: periop-udi-caddy
+    depends_on:
+      - gudid-core
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - PUBLIC_HOSTNAME=${PUBLIC_HOSTNAME}
+      - ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:

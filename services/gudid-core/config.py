@@ -31,9 +31,34 @@ class Config:
     
     # Security
     # Signs the Flask session cookie. A stable value is REQUIRED for SMART App
-    # Launch — the OAuth2 state / PKCE verifier / access token live in the
-    # session across the authorize redirect.
+    # Launch — the OAuth2 state / PKCE verifier / session handle live in the
+    # session across the authorize redirect. The default is public in this repo,
+    # so a deployment that keeps it can have its sessions forged; see the
+    # startup check in app.py, which refuses to boot on it in production.
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    DEFAULT_SECRET_KEYS = {
+        "dev-secret-key-change-in-production",
+        "dev-secret-key",
+        "change-this-to-a-random-secret-key",
+    }
+
+    # ---- Access gate (auth.py) ----
+    # Enforced by default; turn off only for local development.
+    REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "true").lower() not in ("0", "false", "no")
+    # Shared passcode for the synthetic-data deployment. No passcode set means
+    # local sign-in is unavailable and SMART launch is the only way in.
+    DEMO_PASSCODE = os.getenv("DEMO_PASSCODE", "")
+    SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", 12 * 3600))
+
+    # Cookie hardening. SECURE_COOKIES should be on wherever the app is served
+    # over HTTPS, which is anywhere it is publicly reachable.
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"  # Lax, not Strict: the SMART callback is a
+                                     # cross-site redirect back into the app and
+                                     # must carry the session cookie.
+    SESSION_COOKIE_SECURE = os.getenv("SECURE_COOKIES", "false").lower() in (
+        "1", "true", "yes",
+    )
 
     # ---- SMART App Launch v2 (services/gudid-core/smart_launch.py) ----
     # Public client, PKCE, no secret. Tested against the SMART Health IT
@@ -59,6 +84,13 @@ class Config:
     )
     # Public base URL of THIS app, for building the OAuth redirect_uri.
     APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
+
+    # The SMART Health IT sandbox always decodes the `launch` parameter as
+    # base64url JSON, so a conformant standalone launch (which sends no `launch`)
+    # fails against it. Send its simulation options for these hosts only; any
+    # other server gets a standard standalone launch. Set empty to disable.
+    SMART_SIM_HOSTS = os.getenv("SMART_SIM_HOSTS", "launch.smarthealthit.org")
+    SMART_SIM_LAUNCH_TYPE = os.getenv("SMART_SIM_LAUNCH_TYPE", "provider-standalone")
 
     
     # OpenAI API Settings

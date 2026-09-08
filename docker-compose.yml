@@ -22,10 +22,16 @@ services:
     depends_on:
       hapi-db:
         condition: service_healthy
+    # Bound to 127.0.0.1, NOT 0.0.0.0. HAPI has no authentication of its own, so
+    # publishing it on a deployed host would expose unauthenticated read/write/
+    # delete over every patient record. The app reaches it as http://hapi:8080
+    # on the Docker network; this mapping exists only for local debugging.
+    # docker-compose.deploy.yml removes it entirely.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - SPRING_CONFIG_LOCATION=file:///app/config/application.yaml
+      - CORS_ALLOWED_ORIGIN=${CORS_ALLOWED_ORIGIN:-http://localhost:8090}
     volumes:
       - ./infrastructure/hapi/application.yaml:/app/config/application.yaml:ro
     # NOTE: the hapiproject/hapi image is distroless (no shell), so an in-container
@@ -56,8 +62,9 @@ services:
     depends_on:
       hapi:
         condition: service_started
+    # Localhost only — the app calls it as http://cds-hooks:5001 internally.
     ports:
-      - "8091:5001"
+      - "127.0.0.1:8091:5001"
     environment:
       - PORT=5001
       - FHIR_BASE_URL=http://hapi:8080/fhir
@@ -81,13 +88,18 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      # No default: the app refuses to start on the built-in key when auth is on.
+      - SECRET_KEY=${SECRET_KEY}
       - HOST_IP=${HOST_IP}
       - PORT=8090
       - FLASK_ENV=${FLASK_ENV:-production}
       - FHIR_BASE_URL=http://hapi:8080/fhir
-      - PUBLIC_FHIR_BASE_URL=http://localhost:8080/fhir
+      - PUBLIC_FHIR_BASE_URL=${PUBLIC_FHIR_BASE_URL:-http://localhost:8080/fhir}
       - CDS_HOOKS_URL=http://cds-hooks:5001
+      # ---- Access gate ----
+      - REQUIRE_AUTH=${REQUIRE_AUTH:-true}
+      - DEMO_PASSCODE=${DEMO_PASSCODE}
+      - SECURE_COOKIES=${SECURE_COOKIES:-false}
       # ---- SMART App Launch v2 ----
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8090}
       - SMART_CLIENT_ID=${SMART_CLIENT_ID:-periop-udi}

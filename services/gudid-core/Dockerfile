@@ -22,4 +22,6 @@ COPY services/fhir-bridge/gudid_to_uscore_device.py services/fhir-bridge/hapi_cl
 
 RUN mkdir -p static/qr_codes data eval/usage_logs
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 2 app:app"]
+# --access-logfile - sends the request log to stdout so `docker compose logs`
+# shows the SMART launch/callback hops and every FHIR-backed request.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 2 --access-logfile - app:app"]

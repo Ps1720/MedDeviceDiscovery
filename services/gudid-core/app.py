@@ -37,6 +37,8 @@ from scan_to_chart import (
     clear_fhir_context,
 )
 from smart_launch import smart_bp, current_smart, session_fhir_context
+from auth_routes import auth_bp
+import auth
 import threading
 import overrides as institution_overrides
 import protocol_db
@@ -44,28 +46,56 @@ import protocol_seed
 import protocol_service
 import ifu_pipeline
 import ifu_finder
+import pathway_engine
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# A deployment running on the repo's default SECRET_KEY has forgeable sessions:
+# anyone who can read this repository can mint a signed cookie. Refuse to start
+# rather than serve a public deployment in that state.
+if Config.REQUIRE_AUTH and Config.SECRET_KEY in Config.DEFAULT_SECRET_KEYS:
+    raise SystemExit(
+        "REFUSING TO START: SECRET_KEY is the built-in default, which is public "
+        "in this repository, so session cookies would be forgeable.\n"
+        "  Generate one:  python -c \"import secrets; print(secrets.token_hex(32))\"\n"
+        "  Then set SECRET_KEY in .env (or REQUIRE_AUTH=false for local dev)."
+    )
+
 # ---- SMART App Launch v2 (Phase 6) ----
 app.register_blueprint(smart_bp)
+app.register_blueprint(auth_bp)
 
 
 @app.before_request
-def _bind_smart_fhir_context():
-    """When an EHR-launched SMART session is active, route this request's FHIR
-    reads/writes at the launched server with its bearer token; otherwise use the
-    local HAPI server."""
+def _gate_and_bind_fhir_context():
+    """
+    Single entry point for access control and FHIR routing.
+
+    The session decides both whether the request is allowed and which FHIR
+    server answers it. No session means no patient data — never a silent
+    fallback to the open local server.
+    """
+    clear_fhir_context()
+
     try:
-        ctx = session_fhir_context()
+        smart_ctx = session_fhir_context()
     except Exception as exc:  # noqa: BLE001 - never block a request on this
         print(f"[smart] context resolution failed: {exc}")
-        ctx = None
-    if ctx:
-        set_fhir_context(ctx[0], ctx[1])
-    else:
-        clear_fhir_context()
+        smart_ctx = None
+
+    if smart_ctx:
+        # EHR-launched: read/write against the launched server with its token.
+        set_fhir_context(smart_ctx[0], smart_ctx[1])
+        return None
+
+    if not auth.enabled() or auth.is_public(request.endpoint):
+        return None  # local HAPI, per scan_to_chart's defaults
+
+    if auth.local_session():
+        return None  # signed in: local HAPI
+
+    return auth.deny()
 
 
 @app.teardown_request
@@ -75,11 +105,16 @@ def _clear_smart_fhir_context(_exc):
 
 @app.context_processor
 def _inject_smart_context():
-    """Expose `smart` (the active SMART session summary, or None) to templates."""
+    """Expose session state to templates: `smart` for an EHR launch, `signed_in`
+    for the local deployment session."""
     try:
-        return {"smart": current_smart()}
+        return {
+            "smart": current_smart(),
+            "signed_in": auth.local_session() is not None,
+            "auth_required": auth.enabled(),
+        }
     except Exception:  # noqa: BLE001
-        return {"smart": None}
+        return {"smart": None, "signed_in": False, "auth_required": True}
 
 
 # ============================================
@@ -494,6 +529,37 @@ def _safe_protocol(record, context):
 # ============================================
 # PERIOPERATIVE PROTOCOL LAYER
 # ============================================
+
+@app.route("/api/pathway")
+def api_pathway():
+    """
+    Resolve the perioperative pathway for a cardiac device from three case
+    parameters. Query params: class_key, surgical_site, cautery, pacing_dependence.
+
+    Unanswered or unknown parameters resolve to the conservative branch and the
+    response reports the assumption, rather than silently treating absent input
+    as low risk.
+    """
+    class_key = (request.args.get("class_key") or "").strip()
+    if not class_key:
+        return jsonify({"error": "class_key is required"}), 400
+    answers = {
+        "surgical_site":     request.args.get("surgical_site"),
+        "cautery":           request.args.get("cautery"),
+        "pacing_dependence": request.args.get("pacing_dependence"),
+    }
+    return jsonify(pathway_engine.resolve(class_key, answers))
+
+
+@app.route("/api/pathway/inputs")
+def api_pathway_inputs():
+    """The case questions to render, and which device classes they apply to."""
+    return jsonify({
+        "inputs": pathway_engine.inputs_spec(),
+        "applies_to_classes": pathway_engine.load_rules().get("applies_to_classes", []),
+        "version": pathway_engine.load_rules().get("version"),
+    })
+
 
 @app.route("/api/protocol/by-di/<di>")
 def api_protocol_by_di(di):

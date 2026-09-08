@@ -31,26 +31,32 @@ hapi:
         name: hl7.fhir.us.core
         version: 8.0.1
 
-    # ---- Validation (Build.md acceptance: HAPI rejects an invalid Device) ----
+    # ---- Validation (acceptance: HAPI rejects an invalid Device) ----
     validation:
       requests_enabled: true
       responses_enabled: false
 
-    # ---- CORS open for local development ----
+    # ---- CORS ----
+    # HAPI is not published to the host (see docker-compose.yml): only the app,
+    # on the internal Docker network, talks to it. Nothing browser-side calls it
+    # cross-origin, so no origin needs to be allowed. Set CORS_ALLOWED_ORIGIN to
+    # your app's public origin only if you deliberately expose HAPI.
     cors:
-      allow_Credentials: true
+      allow_Credentials: false
       allowed_origin:
-        - "*"
+        - ${CORS_ALLOWED_ORIGIN:http://localhost:8090}
 
-    # ---- Capabilities kept lean for the demo ----
-    allow_multiple_delete: true
+    # ---- Capabilities ----
+    # allow_multiple_delete stays OFF: it permits conditional mass deletion
+    # (DELETE /Patient?_lastUpdated=gt2000 wipes every match in one request),
+    # which is not something a demo deployment should be able to do by accident
+    # or otherwise.
+    allow_multiple_delete: false
     allow_external_references: true
     reuse_cached_search_results_millis: 60000
 
-    # ---- Browsable web UI (HAPI Tester overlay) at http://localhost:8080/ ----
-    tester:
-      home:
-        name: PeriopUDI HAPI FHIR Server
-        server_address: http://localhost:8080/fhir
-        refuse_to_fetch_third_party_urls: false
-        fhir_version: R4
+    # ---- Browsable web UI (HAPI Tester overlay) ----
+    # Deliberately omitted. The overlay is an unauthenticated admin console over
+    # the whole data set; HAPI only mounts it when a `tester:` map is present, so
+    # leaving the key out disables it. (Setting it to null does NOT work — Spring
+    # fails to bind null to the expected Map and the server refuses to start.)

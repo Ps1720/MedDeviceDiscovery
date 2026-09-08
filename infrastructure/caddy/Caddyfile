@@ -1,0 +1,32 @@
+# TLS terminator for the public deployment. Caddy fetches and renews a
+# Let's Encrypt certificate for PUBLIC_HOSTNAME automatically, so nothing but
+# 80/443 is ever exposed and OAuth codes/tokens never cross the wire in clear.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$PUBLIC_HOSTNAME} {
+	encode gzip
+
+	# The app is the only thing proxied. HAPI (8080) and CDS Hooks (5001) stay
+	# on the internal Docker network and are deliberately unreachable from here.
+	reverse_proxy gudid-core:8090 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up Host {host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
