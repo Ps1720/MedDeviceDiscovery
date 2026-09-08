@@ -30,7 +30,7 @@ import json
 import secrets
 import time
 from typing import Optional
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlparse
 
 import requests
 from flask import (
@@ -122,6 +122,28 @@ def _safe_next(nxt: Optional[str]) -> str:
     if not nxt.startswith("/") or nxt.startswith("//") or "\\" in nxt:
         return ""
     return nxt
+
+
+def _sim_launch_param(iss: str) -> Optional[str]:
+    """
+    Launch-context parameter for a standalone launch, when the target needs one.
+
+    A conformant standalone launch sends no `launch` parameter — the app asks
+    for launch/patient and the auth server picks the context. The SMART Health
+    IT sandbox is not conformant here: its authorize endpoint always decodes a
+    `launch` value as base64url JSON "launch options", so omitting it fails with
+    "Invalid launch options: SyntaxError: Unexpected end of JSON input".
+
+    So supply the sandbox's simulation options when, and only when, the target
+    is that sandbox. Every other server gets a standard standalone launch.
+    """
+    if not Config.SMART_SIM_HOSTS:
+        return None
+    host = (urlparse(iss).hostname or "").lower()
+    if host not in {h.strip().lower() for h in Config.SMART_SIM_HOSTS.split(",") if h.strip()}:
+        return None
+    opts = json.dumps({"launch_type": Config.SMART_SIM_LAUNCH_TYPE})
+    return _b64url(opts.encode("utf-8"))
 
 
 def _redirect_uri() -> str:
@@ -263,7 +285,10 @@ def launch_standalone():
     """Standalone launch — no EHR context; auth server prompts for a patient."""
     iss = (request.args.get("iss") or Config.SMART_DEFAULT_ISS).strip()
     return _begin_launch(
-        iss, None, Config.SMART_STANDALONE_SCOPES, nxt=request.args.get("next") or ""
+        iss,
+        _sim_launch_param(iss),
+        Config.SMART_STANDALONE_SCOPES,
+        nxt=request.args.get("next") or "",
     )
 
 
